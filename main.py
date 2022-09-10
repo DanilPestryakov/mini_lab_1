@@ -32,6 +32,7 @@ class Entries:
         new_entry.icursor(0)
         new_entry.bind('<FocusIn>', self.handle_focusIn)
         new_entry.bind('<FocusOut>', self.handle_focusOut)
+        new_entry.bind('<Control-d>', self.handle_hotKey)
         new_entry.focus()
         new_entry.pack()
         plot_button = self.parent_window.get_button_by_name('plot')
@@ -53,6 +54,10 @@ class Entries:
     # handle of focusion out (ручка для расфокусировки)
     def handle_focusOut(self, event):
         self.focusedEntry = None
+        
+    # handle of deleting entries with hotkeys (ручка для удаления текстовых полей по кнопке)
+    def handle_hotKey(self, event):
+        self.del_entry(event.widget)
 
 
 # class for plotting (класс для построения графиков)
