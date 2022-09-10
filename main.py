@@ -43,7 +43,17 @@ class Entries:
         
     # deleting of entry (удаление текстового поля)
     def del_entry(self, entry):
-        if entry in self.entries_list:
+        if entry not in self.entries_list: return
+        delete = True
+        if entry.get() != "": 
+            mw = YesNoModalWindow(self.parent_window, title='Удаление непустой строки', labeltext='Сколько?')
+            ok_button = Button(master=mw.top, text='Yes', command=mw.yes)
+            cancel_button = Button(master=mw.top, text='No', command=mw.no)
+            mw.add_button(ok_button)
+            mw.add_button(cancel_button)
+            delete = mw.open()
+            
+        if delete: 
             self.entries_list.remove(entry)
             entry.pack_forget()
     
@@ -221,10 +231,28 @@ class ModalWindow:
     def add_button(self, button):
         self.buttons.append(button)
         button.pack(pady=5)
-
+    
     def cancel(self):
         self.top.destroy()
-
+        
+# class for generate yes/no modal windows (класс для генерации модальных окон с да/нет)
+class YesNoModalWindow(ModalWindow):
+    def __init__(self, parent, title, labeltext=''):
+        super().__init__(parent, title, labeltext)
+        self.parent = parent
+        self.result = False
+        
+    def open(self):
+        self.top.wait_window()
+        return self.result
+        
+    def yes(self):
+        self.result = True
+        self.cancel()
+        
+    def no(self):
+        self.result = False
+        self.cancel()
 
 # app class (класс приложения)
 class App(Tk):
