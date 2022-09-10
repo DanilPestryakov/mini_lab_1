@@ -239,7 +239,6 @@ class ModalWindow:
 class YesNoModalWindow(ModalWindow):
     def __init__(self, parent, title, labeltext=''):
         super().__init__(parent, title, labeltext)
-        self.parent = parent
         self.result = False
         
     def open(self):
