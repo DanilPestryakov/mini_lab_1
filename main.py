@@ -21,6 +21,7 @@ class Entries:
     def __init__(self):
         self.entries_list = []
         self.parent_window = None
+        self.focus_entry = None
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
@@ -29,6 +30,8 @@ class Entries:
     def add_entry(self):
         new_entry = Entry(self.parent_window)
         new_entry.icursor(0)
+        new_entry.bind('<FocusIn>', self.handle_FocusIn)
+        new_entry.bind('<Control-d>', self.handle_hotkey_delete)
         new_entry.focus()
         new_entry.pack()
         plot_button = self.parent_window.get_button_by_name('plot')
@@ -37,6 +40,16 @@ class Entries:
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
 
+    def delete_entry(self,entry):
+        if entry in self.entries_list:
+            self.entries_list.remove(entry)
+            entry.pack_forget()
+
+    def handle_FocusIn(self, event):
+        self.focus_entry = event.widget
+
+    def handle_hotkey_delete(self, event):
+        self.delete_entry(event.widget)
 
 # class for plotting (класс для построения графиков)
 class Plotter:
@@ -157,6 +170,22 @@ class Commands:
         self._state.save_state()
         return self
 
+    def delete_field(self):
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.parent_window.entries.delete_entry()
+
+    def delete_focus(self):
+        focus_entry = self.parent_window.entries.focus_entry
+        if (len(focus_entry.get())==0):
+            self.parent_window.entries.delete_entry(focus_entry)
+        else:
+            modal_w = ModalWindow(self.parent_window, title="Empty", labeltext="Дороги назад уже не будет")
+            leave_button = Button(master=modal_w.top, text='Ой ой ой, спасибо', command=modal_w.cancel)
+            modal_w.add_button(leave_button)
+
+
+
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
@@ -198,8 +227,7 @@ class ModalWindow:
     def cancel(self):
         self.top.destroy()
 
-
-# app class (класс приложения)
+    # app class (класс приложения)
 class App(Tk):
     def __init__(self, buttons, plotter, commands, entries):
         super().__init__()
@@ -247,11 +275,13 @@ if __name__ == "__main__":
     # command's registration (регистрация команд)
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
+    commands_main.add_command('delete_focus', commands_main.delete_focus)
     commands_main.add_command('save_as', commands_main.save_as)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('delete_focus', 'Удалить поле', 'delete_focus', hot_key='<Control-d>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
