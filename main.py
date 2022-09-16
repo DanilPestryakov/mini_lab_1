@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfile
 
 from matplotlib import pyplot as plt
 
@@ -26,16 +26,53 @@ class Entries:
         self.parent_window = parent_window
 
     # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
+    def add_entry(self, entry_text=''):
         new_entry = Entry(self.parent_window)
         new_entry.icursor(0)
         new_entry.focus()
         new_entry.pack()
+        new_entry.insert(0, entry_text)
         plot_button = self.parent_window.get_button_by_name('plot')
         if plot_button:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+
+    # deleting of focused entry (очистка активного текстового поля)
+    def del_entry(self):
+        focus = self.parent_window.focus_get()
+        label_text = """Если вы уверены, что хотите очистить строку,
+                        нажмите Продолжить"""
+        if type(focus) == Entry:
+            if focus.get() != '':
+                active_window = ModalWindow(self.parent_window, title='Очистка строки с функцией', labeltext=label_text)
+                cd = partial(active_window.continue_clearing, entry=focus)
+                continue_button = Button(master=active_window.top, text='Продолжить', command=cd)
+                active_window.add_button(continue_button)
+                cancel_button = Button(master=active_window.top, text="Отменить", command=active_window.cancel)
+                active_window.add_button(cancel_button)
+            else:
+                focus.delete(0, END)
+
+    # deleting of textbox (удаление поля ввода функции)
+    def del_textbox(self):
+        focus = self.parent_window.focus_get()
+        label_text = """Если вы уверены, что хотите удалить строку ввода,
+                                нажмите Продолжить"""
+        if type(focus) == Entry:
+            if focus.get() != "":
+                active_window = ModalWindow(self.parent_window, title='Очистка строки с функцией', labeltext=label_text)
+                cd = partial(active_window.continue_deletion, entry=focus, entries_list=self.entries_list)
+                continue_button = Button(master=active_window.top, text='Продолжить', command=cd)
+                active_window.add_button(continue_button)
+                cancel_button = Button(master=active_window.top, text="Отменить", command=active_window.cancel)
+                active_window.add_button(cancel_button)
+            else:
+                self.entries_list.pop(self.entries_list.index(focus)).destroy()
+            plot_button = self.parent_window.get_button_by_name('plot')
+            if plot_button:
+                plot_button.pack_forget()
+            self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
 
 
 # class for plotting (класс для построения графиков)
@@ -153,9 +190,30 @@ class Commands:
         self.__forget_navigation()
         self.parent_window.entries.add_entry()
 
+    def del_func(self, *args, **kwargs):
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.parent_window.entries.del_entry()
+
+    def del_text_box(self):
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.parent_window.entries.del_textbox()
+
     def save_as(self):
         self._state.save_state()
         return self
+
+    def open_file(self):
+        file = askopenfile()
+        if file:
+            data = json.load(file)
+            self.parent_window.entries.entries_list = []
+            for text in data['list_of_function']:
+                self.parent_window.entries.add_entry(text)
+            self.parent_window.commands.plot()
+        return self
+
 
 
 # class for buttons storage (класс для хранения кнопок)
@@ -198,6 +256,15 @@ class ModalWindow:
     def cancel(self):
         self.top.destroy()
 
+    def continue_clearing(self, entry):
+        entry.delete(0, END)
+        self.top.destroy()
+
+    def continue_deletion(self, entry, entries_list):
+        entry.delete(0, END)
+        self.top.destroy()
+        entries_list.pop(entries_list.index(entry)).destroy()
+
 
 # app class (класс приложения)
 class App(Tk):
@@ -231,6 +298,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Open file...", command=self.commands.get_command_by_name('open_file'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -248,10 +316,15 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('del_func', commands_main.del_func)
+    commands_main.add_command('open_file', commands_main.open_file)
+    commands_main.add_command('del_text_box', commands_main.del_text_box)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('del_func', 'Очистить поле ввода', 'del_func', hot_key='<Control-d>')
+    app.add_button('del_text_box', 'Удалить поле ввода', 'del_text_box', hot_key='<Control-x>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
