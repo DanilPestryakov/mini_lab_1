@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfile
 
 from matplotlib import pyplot as plt
 
@@ -26,17 +26,58 @@ class Entries:
         self.parent_window = parent_window
 
     # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
+    def add_entry(self, func=''):
         new_entry = Entry(self.parent_window)
         new_entry.icursor(0)
         new_entry.focus()
         new_entry.pack()
+        new_entry.insert(0, func)
         plot_button = self.parent_window.get_button_by_name('plot')
         if plot_button:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
 
+    # clearing the input line from the text (очистка строки ввода от текста)
+    def clear_entry(self):
+        focus_entry = self.parent_window.focus_get()
+        if type(focus_entry) == Entry: focus_entry.delete(0, END)
+
+    # deleting the active input line (удаление активной строки ввода)
+    def delete_entry(self):
+        focus_entry = self.parent_window.focus_get()
+        if type(focus_entry) == Entry:
+            if focus_entry.get() != '':
+                # a pop-up window with a warning (всплывающее окно с предупреждением)
+                mw = ModalWindow(self.parent_window, title='Удаление строки ввода',
+                                 labeltext='В строке уже есть данные.\n Вы уверены, что хотите удалить строку ввода?')
+                callback = partial(mw.continue_deleting_entry, entry=focus_entry, entries_list=self.entries_list)
+                yes_button = Button(master=mw.top, text='Да', command=callback)
+                no_button = Button(master=mw.top, text='Нет', command=mw.cancel)
+                mw.add_button(yes_button)
+                mw.add_button(no_button)
+            else:
+                focus_index=self.entries_list.index(focus_entry)
+                self.entries_list.pop(focus_index).destroy()
+            plot_button = self.parent_window.get_button_by_name('plot')
+            if plot_button:
+                plot_button.pack_forget()
+            self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
+
+    # deleting all input lines (удаление всех строк ввода)
+    def delete_all_entries(self):
+        mw = ModalWindow(self.parent_window, title='Удаление всех строк ввода',
+                         labeltext='Вы уверены, что хотите удалить все строки ввода?')
+        callback = partial(mw.continue_deleting_all_entries, entries_list=self.entries_list)
+        yes_button = Button(master=mw.top, text='Да', command=callback)
+        no_button = Button(master=mw.top, text='Нет', command=mw.cancel)
+        mw.add_button(yes_button)
+        mw.add_button(no_button)
+
+        plot_button = self.parent_window.get_button_by_name('plot')
+        if plot_button:
+            plot_button.pack_forget()
+        self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
 
 # class for plotting (класс для построения графиков)
 class Plotter:
@@ -153,6 +194,32 @@ class Commands:
         self.__forget_navigation()
         self.parent_window.entries.add_entry()
 
+    def clear_func(self, *args, **kwargs):
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.parent_window.entries.clear_entry()
+
+    def delete_the_input_line(self, *args, **kwargs):
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.parent_window.entries.delete_entry()
+
+    def delete_all_of_the_input_lines(self, *args, **kwargs):
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.parent_window.entries.delete_all_entries()
+
+    def upload_a_saved_file(self):
+        file = askopenfile()
+        if file != None:
+            loaded_file = json.load(file)
+            for entry in self.parent_window.entries.entries_list:
+                entry.destroy()
+            self.parent_window.entries.entries_list=[]
+            for func in loaded_file['list_of_function']:
+                self.parent_window.entries.add_entry(func)
+            self.parent_window.commands.plot()
+
     def save_as(self):
         self._state.save_state()
         return self
@@ -198,6 +265,18 @@ class ModalWindow:
     def cancel(self):
         self.top.destroy()
 
+    def continue_deleting_entry(self, entry, entries_list):
+        self.top.destroy()
+        entry.delete(0, END)
+        entries_list.pop(entries_list.index(entry)).destroy()
+
+    def continue_deleting_all_entries(self, entries_list):
+        self.top.destroy()
+        number_of_entry = len(entries_list)
+        for i in range(number_of_entry):
+            if type(entries_list[0]) == Entry:
+                entries_list[0].delete(0, END)
+                entries_list.pop(0).destroy()
 
 # app class (класс приложения)
 class App(Tk):
@@ -231,6 +310,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Load file", command=self.commands.get_command_by_name('upload_a_saved_file'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -247,14 +327,20 @@ if __name__ == "__main__":
     # command's registration (регистрация команд)
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
+    commands_main.add_command('clear_func', commands_main.clear_func)
+    commands_main.add_command('delete_the_input_line', commands_main.delete_the_input_line)
+    commands_main.add_command('delete_all_of_the_input_lines', commands_main.delete_all_of_the_input_lines)
+    commands_main.add_command('upload_a_saved_file', commands_main.upload_a_saved_file)
     commands_main.add_command('save_as', commands_main.save_as)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('delete_the_input_line', 'Удалить строку ввода', 'delete_the_input_line', hot_key='<Control-b>')
+    app.add_button('delete_all_of_the_input_lines', 'Удалить все строки ввода', 'delete_all_of_the_input_lines', hot_key='<Control-d>')
+    app.add_button('clear_func', 'Очистить поле ввода', 'clear_func', hot_key='<Control-e>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
-    # добавил комментарий для коммита
     # application launch (запуск "вечного" цикла приложеня)
     app.mainloop()
