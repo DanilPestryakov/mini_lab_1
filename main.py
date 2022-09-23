@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfile
 
 from matplotlib import pyplot as plt
 
@@ -26,16 +26,36 @@ class Entries:
         self.parent_window = parent_window
 
     # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
+    def add_entry(self, func=' '):
         new_entry = Entry(self.parent_window)
         new_entry.icursor(0)
         new_entry.focus()
         new_entry.pack()
+        new_entry.insert(0, func)
         plot_button = self.parent_window.get_button_by_name('plot')
         if plot_button:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+
+
+
+    def delete_entry(self):
+        entry = self.parent_window.focus_get()
+        if entry in self.entries_list:
+            if len(entry.get()) > 0:
+               modal_window = ModalWindow(self.parent_window, 'Непустое поле', 'Попытка удалить непустое поле')
+               button_1 = Button(master=modal_window.top, text='Ок', command=modal_window.cancel)
+               modal_window.add_button(button_1)
+
+            else:
+                self.entries_list.remove(entry)
+                entry.forget()
+
+
+
+
+
 
 
 # class for plotting (класс для построения графиков)
@@ -153,10 +173,24 @@ class Commands:
         self.__forget_navigation()
         self.parent_window.entries.add_entry()
 
+    def delete_entry(self, *args, **kwargs):
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.parent_window.entries.delete_entry()
+
     def save_as(self):
         self._state.save_state()
         return self
 
+    def load_file(self):
+        load = json.load(askopenfile())
+        for entry in self.parent_window.entries.entries_list:
+            entry.destroy()
+        self.parent_window.entries.entries_list = []
+        for func in load['list_of_function']:
+            self.parent_window.entries.add_entry(func)
+        self.parent_window.commands.plot()
+        return self
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
@@ -231,6 +265,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Load file", command=self.commands.get_command_by_name('load_file'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -248,10 +283,13 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('delete_entry', commands_main.delete_entry)
+    commands_main.add_command('load_file', commands_main.load_file)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('delete_entry', 'Удалить поле', 'delete_entry', hot_key='<Alt-l>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
