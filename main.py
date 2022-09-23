@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfilename
 
 from matplotlib import pyplot as plt
 
@@ -96,6 +96,8 @@ class Commands:
         self._state = Commands.State()
         self.__empty_entry_counter = 0
         self.parent_window = None
+        # ДОБАВЛЕНО
+        self._state.figure = None
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
@@ -156,6 +158,47 @@ class Commands:
     def save_as(self):
         self._state.save_state()
         return self
+
+    # ДОБАВЛЕНО
+    # Удаление текста
+    def clean_entries(self, *args, **kwargs):
+        def is_not_blank(s):
+            return bool(s and not s.isspace())
+
+        focused_entry = self.parent_window.focus_get()
+        if not isinstance(focused_entry, Entry):
+            return
+
+        entry_text = focused_entry.get()
+        focused_entry.delete(0, END)
+        focused_entry.insert(0, "")
+
+        if is_not_blank(entry_text):
+            mw = ModalWindow(self.parent_window, title='Очистка поля',
+                             labeltext="Поле было очищено. Можно нажимать ОК :3")
+            ok_button = Button(master=mw.top, text='OK', command=mw.cancel)
+            mw.add_button(ok_button)
+
+        focused_entry.destroy()
+        self.parent_window.entries.entries_list.remove(focused_entry)
+
+    # ДОБАВЛЕНО
+    # Загрузка графиков
+    def load_plots(self, *args, **kwargs):
+        file_out = askopenfilename(defaultextension=".json")
+        if file_out is not None:
+            with open(file_out, "r") as f:
+                list_of_function = json.load(f)['list_of_function']
+                figure = self.parent_window.plotter.plot(list_of_function)
+                self._state.figure = figure
+                self.__forget_canvas()
+                self.__figure_canvas = FigureCanvasTkAgg(figure, self.parent_window)
+                self.__forget_navigation()
+                self.__navigation_toolbar = NavigationToolbar2Tk(self.__figure_canvas, self.parent_window)
+                self.__figure_canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
+                plot_button = self.parent_window.get_button_by_name('plot')
+                if plot_button:
+                    plot_button.pack_forget()
 
 
 # class for buttons storage (класс для хранения кнопок)
@@ -231,6 +274,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Load from", command=self.commands.get_command_by_name('load_plots'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -248,10 +292,13 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('clean_entries', commands_main.clean_entries)
+    commands_main.add_command('load_plots', commands_main.load_plots)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('clean_entries', 'Удалить текстовое поле', 'clean_entries', hot_key='<Control-d>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
