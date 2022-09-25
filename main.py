@@ -21,16 +21,21 @@ class Entries:
     def __init__(self):
         self.entries_list = []
         self.parent_window = None
+        self.current_entry = None
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
+
+    def on_focus(self, evt):
+        self.current_entry = evt.widget
 
     # adding of new entry (добавление нового текстового поля)
     def add_entry(self):
         new_entry = Entry(self.parent_window)
         new_entry.icursor(0)
         new_entry.focus()
-        new_entry.pack()
+        new_entry.pack(fill=X)
+        new_entry.bind('<FocusIn>', self.on_focus)
         plot_button = self.parent_window.get_button_by_name('plot')
         if plot_button:
             plot_button.pack_forget()
@@ -71,6 +76,10 @@ class Plotter:
         self._last_plotted_list_of_function = list_of_function
         self._last_plotted_figure = fig
         return fig
+
+
+def is_not_blank(s):
+    return bool(s and not s.isspace())
 
 
 # class for commands storage (класс для хранения команд)
@@ -115,9 +124,6 @@ class Commands:
             self.__navigation_toolbar.pack_forget()
 
     def plot(self, *args, **kwargs):
-        def is_not_blank(s):
-            return bool(s and not s.isspace())
-
         self._state.reset_state()
         list_of_function = []
         for entry in self.parent_window.entries.entries_list:
@@ -156,6 +162,44 @@ class Commands:
     def save_as(self):
         self._state.save_state()
         return self
+
+    def delete_on_click_proccessing(self, *args, **kwargs):
+        mw = kwargs.get('mw')
+        button = kwargs.get('button')
+        if mw is not None:
+            if button == 'no':
+                mw.cancel()
+                return
+            else:
+                mw.cancel()
+        self.parent_window.entries.current_entry.pack_forget()
+        self.parent_window.entries.entries_list.remove(self.parent_window.entries.current_entry)
+        self.parent_window.entries.current_entry = None
+
+    def delete_on_click(self, *args, **kwargs):
+        if self.parent_window.entries.current_entry is not None:
+            field = self.parent_window.entries.current_entry.get()
+            if is_not_blank(field):
+                window = ModalWindow(self.parent_window, title='Окошко',
+                                     labeltext='Вы уверены что хотите удалить данное поле?')
+                yes_command = partial(self.delete_on_click_proccessing, mw=window)
+                yes_button = Button(master=window.top, text='Да', command=yes_command)
+                window.add_button(yes_button)
+                no_command = partial(self.delete_on_click_proccessing, mw=window, button='no')
+                no_button = Button(master=window.top, text='Нет', command=no_command)
+                window.add_button(no_button)
+            else:
+                self.delete_on_click_proccessing()
+
+    # def delete_on_click(self, entry):
+    #     if entry is not None:
+    #         entry.pack_forget()
+    #         entry.parent_window.entries.entries_list.pop(entry)
+
+    # def delete_entry(self, entry, d_button):
+    #     entry.pack_forget()
+    #     entry.parent_window.entries.entries_list.pop(entry)
+    #     d_button.parent_window.buttons.delete_button(d_button)
 
 
 # class for buttons storage (класс для хранения кнопок)
@@ -248,10 +292,13 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('delete_on_click', commands_main.delete_on_click)
+    # commands_main.add_command('delete_entry', commands_main.delete_entry)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('delete_on_click', 'Удалить активное поле', 'delete_on_click', hot_key='<Control-d>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
