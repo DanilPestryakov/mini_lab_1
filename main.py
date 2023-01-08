@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfile
 
 from matplotlib import pyplot as plt
 
@@ -26,8 +26,9 @@ class Entries:
         self.parent_window = parent_window
 
     # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
+    def add_entry(self, entryText=""):
         new_entry = Entry(self.parent_window)
+        new_entry.insert(0,entryText)
         new_entry.icursor(0)
         new_entry.focus()
         new_entry.pack()
@@ -36,6 +37,24 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+
+    def delete_entry(self):
+        entry = self.parent_window.focus_get()
+        if (type(entry) == Entry):
+            if entry.get() != "":
+                mw = ModalWindow(self.parent_window, title='Enter Function', labeltext='Do you really want to delete that line?'
+                                                            ', Press Continue, or - Cancel')
+                callback = partial(mw.continue_deleting, entry=entry, entries_list=self.entries_list)
+                continue_button = Button(master=mw.top, text='Continue', command=callback)
+                cancel_button = Button(master=mw.top, text="Cancel", command=mw.cancel)
+                mw.add_button(continue_button)
+                mw.add_button(cancel_button)
+            else:
+                self.entries_list.pop(self.entries_list.index(entry)).destroy()
+            plot_button = self.parent_window.get_button_by_name('plot')
+            if plot_button:
+                plot_button.pack_forget()
+            self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
 
 
 # class for plotting (класс для построения графиков)
@@ -117,7 +136,6 @@ class Commands:
     def plot(self, *args, **kwargs):
         def is_not_blank(s):
             return bool(s and not s.isspace())
-
         self._state.reset_state()
         list_of_function = []
         for entry in self.parent_window.entries.entries_list:
@@ -127,12 +145,12 @@ class Commands:
                 list_of_function.append(get_func_str)
             else:
                 if self.__empty_entry_counter == 0:
-                    mw = ModalWindow(self.parent_window, title='Пустая строка', labeltext='Это пример модального окна, '
-                                                                                          'возникающий, если ты ввел '
-                                                                                          'пустую '
-                                                                                          'строку. С этим ничего '
-                                                                                          'делать не нужно. '
-                                                                                          'Просто нажми OK :)')
+                    mw = ModalWindow(self.parent_window, title='Empty Line', labeltext='This is an example of modal window, '
+                                                                                          'which appears, if you enter'
+                                                                                          'empty line'
+                                                                                          'Do not worry about that'
+                                                                                        
+                                                                                          'Just click OK :)')
                     ok_button = Button(master=mw.top, text='OK', command=mw.cancel)
                     mw.add_button(ok_button)
                     self.__empty_entry_counter = 1
@@ -152,10 +170,26 @@ class Commands:
         self.__forget_canvas()
         self.__forget_navigation()
         self.parent_window.entries.add_entry()
+    
+    def delete_func(self, *args, **kwargs):
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.parent_window.entries.delete_entry()
 
     def save_as(self):
         self._state.save_state()
         return self
+    
+    def load(self):
+        f = askopenfile()
+        if f != None:
+            dict = json.load(f)
+            for entry in self.parent_window.entries.entries_list:
+                entry.destroy()
+            self.parent_window.entries.entries_list = []
+            for entryText in dict['list_of_function']:
+                self.parent_window.entries.add_entry(entryText)
+            self.parent_window.commands.plot()
 
 
 # class for buttons storage (класс для хранения кнопок)
@@ -197,7 +231,9 @@ class ModalWindow:
 
     def cancel(self):
         self.top.destroy()
-
+    def continue_deleting(self, entry, entries_list):
+        self.top.destroy()
+        entries_list.pop(entries_list.index(entry)).destroy()
 
 # app class (класс приложения)
 class App(Tk):
@@ -228,9 +264,9 @@ class App(Tk):
     def create_menu(self):
         menu = Menu(self)
         self.config(menu=menu)
-
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Load", command=self.commands.get_command_by_name('load'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -247,11 +283,14 @@ if __name__ == "__main__":
     # command's registration (регистрация команд)
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
+    commands_main.add_command('delete_func', commands_main.delete_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('load', commands_main.load)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('delete_func', 'Удалить функцию', 'delete_func', hot_key='<Control-z>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
