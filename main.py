@@ -1,17 +1,15 @@
 import json
 import matplotlib
-
 import numexpr as ne
 import numpy as np
-
 from functools import partial
 from tkinter import *
 from tkinter.filedialog import asksaveasfile
+from tkinter import messagebox  # Importing a module for working with modal windows
 
+from tkinter import filedialog
 from matplotlib import pyplot as plt
-
-from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
-                                               NavigationToolbar2Tk)
+from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 
 matplotlib.use('TkAgg')
 
@@ -21,21 +19,49 @@ class Entries:
     def __init__(self):
         self.entries_list = []
         self.parent_window = None
+        self.active_entry = None  # Add a variable to track the active text field
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
-    # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
-        new_entry = Entry(self.parent_window)
-        new_entry.icursor(0)
-        new_entry.focus()
-        new_entry.pack()
-        plot_button = self.parent_window.get_button_by_name('plot')
-        if plot_button:
-            plot_button.pack_forget()
-        self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
-        self.entries_list.append(new_entry)
+        # adding of new entry (добавление нового текстового поля)
+        def add_entry():
+            new_entry = Entry(self.parent_window)
+            new_entry.icursor(0)
+            new_entry.focus()
+            new_entry.pack()
+            new_entry.bind('<FocusIn>', self.set_active_entry)  # Bind a handler when receiving focus
+            plot_button = self.parent_window.get_button_by_name('plot')
+            if plot_button:
+                plot_button.pack_forget()
+            self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
+            self.entries_list.append(new_entry)
+
+        # method for deleting the active entry (метод для удаления активного текстового поля)
+        def delete_active_entry():
+            if self.active_entry:  # Checking if there is an active text field
+                if self.active_entry.get().strip() != '':  # Checking that the field is not empty
+                    # Add a modal window confirming deletion
+                    response = messagebox.askquestion("Deletion confirmation", "Are you sure you want to delete the field??")
+                    if response == "yes":
+                        self.active_entry.destroy()  # Removing the active text field
+                        self.entries_list.remove(self.active_entry)  # Removing it from the list
+                        self.active_entry = None  # Resetting the active text field
+                        self.parent_window.commands.plot()  # Update the chart after deleting a field
+                else:
+                    self.active_entry.destroy()  # Removing an empty text field
+                    self.entries_list.remove(self.active_entry)  # Removing it from the list
+                    self.active_entry = None  # Resetting the active text field
+                    self.parent_window.commands.plot()  # Update the chart after deleting a field
+
+        # Method to set active text field
+        def set_active_entry(event):
+            self.active_entry = event.widget
+
+        # Bind methods to a class instance
+        self.add_entry = add_entry
+        self.delete_active_entry = delete_active_entry
+        self.set_active_entry = set_active_entry
 
 
 # class for plotting (класс для построения графиков)
@@ -97,6 +123,8 @@ class Commands:
         self.__empty_entry_counter = 0
         self.parent_window = None
 
+        # Add the command 'load_saved_graphs'
+        self.add_command('load_saved_graphs', self.load_saved_graphs)
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
@@ -157,6 +185,22 @@ class Commands:
         self._state.save_state()
         return self
 
+    def clear_entries(self):
+        for entry in self.parent_window.entries.entries_list:
+            entry.destroy()
+        self.parent_window.entries.entries_list = []
+
+    def load_saved_graphs(self):
+        self.clear_entries()  # Removing all text fields before loading new charts
+        file_in = filedialog.askopenfile(defaultextension=".json")
+        if file_in is not None:
+            data = json.load(file_in)
+            self.parent_window.entries.entries_list.clear()
+            for func_str in data['list_of_function']:
+                self.parent_window.entries.add_entry()
+                self.parent_window.entries.entries_list[-1].insert(0, func_str)
+            self.parent_window.commands.plot()
+
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
@@ -211,6 +255,18 @@ class App(Tk):
         self.plotter.set_parent_window(self)
         self.commands.set_parent_window(self)
         self.buttons.set_parent_window(self)
+        self.create_menu()  # Call the create_menu method after initialization
+
+
+
+        # Adding a "Delete Active Entry" button to the application window
+        delete_active_entry_button = self.buttons.add_button('delete_active_entry', 'Delete Active Entry',
+                                                             self.entries.delete_active_entry)
+        delete_active_entry_button.pack(side=RIGHT, padx=5)
+
+        # Bind the delete_active_entry method to a key "Esc"
+        self.bind('<Escape>', self.delete_active_entry)
+
 
     def add_button(self, name, text, command_name, *args, **kwargs):
         hot_key = kwargs.get('hot_key')
@@ -222,6 +278,9 @@ class App(Tk):
             self.bind(hot_key, callback)
         new_button.pack(fill=BOTH)
 
+    def delete_active_entry(self, event):
+        self.entries.delete_active_entry()
+
     def get_button_by_name(self, name):
         return self.buttons.buttons.get(name)
 
@@ -231,6 +290,8 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Load saved graphs...",
+                              command=self.commands.get_command_by_name('load_saved_graphs'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -254,7 +315,6 @@ if __name__ == "__main__":
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
-    app.create_menu()
-    # добавил комментарий для коммита
-    # application launch (запуск "вечного" цикла приложеня)
+    app.create_menu()  # Вызываем метод create_menu после инициализации
+    # application launch (запуск "вечного" цикла приложения)
     app.mainloop()
