@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfile
 
 from matplotlib import pyplot as plt
 
@@ -26,8 +26,12 @@ class Entries:
         self.parent_window = parent_window
 
     # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
+    def add_entry(self, value=None):
         new_entry = Entry(self.parent_window)
+
+        if value:
+            new_entry.insert(0, value)
+
         new_entry.icursor(0)
         new_entry.focus()
         new_entry.pack()
@@ -38,6 +42,15 @@ class Entries:
         if entry in self.entries_list:
             self.entries_list.remove(entry)
         entry.destroy()
+
+    def clear_entries(self):
+        for entry in self.entries_list:
+            entry.destroy()
+        self.entries_list.clear()
+
+    def create_entries(self, entries_values):
+        for value in entries_values:
+            self.add_entry(value)
 
     def restore_plot_button(self):
         plot_button = self.parent_window.get_button_by_name('plot')
@@ -87,8 +100,8 @@ class Commands:
         def __init__(self):
             self.list_of_function = []
 
-        def save_state(self):
-            tmp_dict = {'list_of_function': self.list_of_function}
+        def save_state(self, entries_list):
+            tmp_dict = {'entries_list': [e.get() for e in entries_list]}
             file_out = asksaveasfile(defaultextension=".json")
             if file_out is not None:
                 json.dump(tmp_dict, file_out)
@@ -96,6 +109,17 @@ class Commands:
 
         def reset_state(self):
             self.list_of_function = []
+
+        def restore_state(self):
+            file_in = askopenfile(defaultextension=".json")
+            tmp_dict = None
+            if file_in is not None:
+                tmp_dict = json.load(file_in)
+
+            if tmp_dict and 'entries_list' in tmp_dict:
+                return tmp_dict['entries_list']
+
+            return []
 
     def __init__(self):
         self.command_dict = {}
@@ -192,7 +216,18 @@ class Commands:
             self.parent_window.entries.restore_plot_button()
 
     def save_as(self):
-        self._state.save_state()
+        self._state.save_state(self.parent_window.entries.entries_list)
+        return self
+
+    def restore(self):
+        self.__forget_canvas()
+        self.__forget_navigation()
+
+        entries_values = self._state.restore_state()
+
+        self.parent_window.entries.clear_entries()
+        self.parent_window.entries.create_entries(entries_values)
+
         return self
 
 
@@ -274,6 +309,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Open...", command=self.commands.get_command_by_name('restore'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -292,6 +328,7 @@ if __name__ == "__main__":
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('del_func', commands_main.del_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('restore', commands_main.restore)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
