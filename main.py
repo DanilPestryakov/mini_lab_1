@@ -6,12 +6,11 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfilename
 
 from matplotlib import pyplot as plt
 
-from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
-                                               NavigationToolbar2Tk)
+from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 
 matplotlib.use('TkAgg')
 
@@ -36,6 +35,43 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+
+    def add_entries_with_text(self, list_of_func):
+        for func in list_of_func:
+            text = StringVar()
+            text.set(func)
+            new_entry = Entry(self.parent_window, textvariable=text)
+            new_entry.pack()
+            self.entries_list.append(new_entry)
+        plot_button = self.parent_window.get_button_by_name('plot')
+        if plot_button:
+            plot_button.pack_forget()
+        self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
+
+    # add function that remove active entry
+    def remove_entry(self, active_entry):
+        if self.entries_list:
+            self.entries_list.remove(active_entry)
+            active_entry.destroy()
+
+    def delete_entries(self):
+        for entry in self.entries_list:
+            entry.destroy()
+        self.entries_list = []
+
+    def remove_entry_with_modal(self):
+        if self.entries_list:
+            active_entry = self.parent_window.focus_get()
+            if active_entry.get():
+                mw = ModalWindow(self.parent_window, title='удаление поля', labeltext='Уверен??????')
+                no_button = Button(master=mw.top, text='No', command=mw.cancel)
+                mw.add_button(no_button)
+                yes_button = Button(master=mw.top, text='Yes', command=mw.cancel)
+                mw.add_button(yes_button)
+                yes_button.bind('<Button-1>', lambda event: self.remove_entry(active_entry))
+                self.parent_window.wait_window(mw.top)
+            else:
+                self.remove_entry(active_entry)
 
 
 # class for plotting (класс для построения графиков)
@@ -96,6 +132,7 @@ class Commands:
         self._state = Commands.State()
         self.__empty_entry_counter = 0
         self.parent_window = None
+        self.canvas = False
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
@@ -105,6 +142,9 @@ class Commands:
 
     def get_command_by_name(self, command_name):
         return self.command_dict[command_name]
+
+    def canvas_is_not(self):
+        self.canvas = False
 
     def __forget_canvas(self):
         if self.__figure_canvas is not None:
@@ -118,6 +158,7 @@ class Commands:
         def is_not_blank(s):
             return bool(s and not s.isspace())
 
+        self.canvas = True
         self._state.reset_state()
         list_of_function = []
         for entry in self.parent_window.entries.entries_list:
@@ -151,11 +192,35 @@ class Commands:
     def add_func(self, *args, **kwargs):
         self.__forget_canvas()
         self.__forget_navigation()
+        self.canvas_is_not()
         self.parent_window.entries.add_entry()
 
     def save_as(self):
         self._state.save_state()
         return self
+
+    def load(self):
+        file_in = askopenfilename(defaultextension=".json")
+        if file_in is not None:
+            with open(file_in, "r") as file:
+                tmp_dict = json.load(file)
+        self.parent_window.entries.delete_entries()
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self._state.reset_state()
+        self._state.list_of_function = tmp_dict['list_of_function']
+        self.parent_window.entries.add_entries_with_text(self._state.list_of_function)
+        self.plot()
+
+    # add command that delete active entry
+    def del_func(self, *args, **kwargs):
+        self.parent_window.entries.remove_entry_with_modal()
+
+    # add command that delete active entry and plot function
+    def del_func_hot_key(self, *args, **kwargs):
+        self.parent_window.entries.remove_entry_with_modal()
+        if self.parent_window.entries.entries_list and self.canvas:
+            self.plot()
 
 
 # class for buttons storage (класс для хранения кнопок)
@@ -213,13 +278,18 @@ class App(Tk):
         self.buttons.set_parent_window(self)
 
     def add_button(self, name, text, command_name, *args, **kwargs):
+        command_name_hot_key = kwargs.get('hot_key_func')
+        if command_name_hot_key:
+            kwargs.pop('hot_key_func')
+        else:
+            command_name_hot_key = command_name
         hot_key = kwargs.get('hot_key')
         if hot_key:
             kwargs.pop('hot_key')
         callback = partial(self.commands.get_command_by_name(command_name), *args, **kwargs)
         new_button = self.buttons.add_button(name=name, text=text, command=callback)
         if hot_key:
-            self.bind(hot_key, callback)
+            self.bind(hot_key, partial(self.commands.get_command_by_name(command_name_hot_key), *args, **kwargs))
         new_button.pack(fill=BOTH)
 
     def get_button_by_name(self, name):
@@ -231,6 +301,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="load", command=self.commands.get_command_by_name('load'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -248,10 +319,15 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('del_func', commands_main.del_func)
+    commands_main.add_command('load', commands_main.load)
+    commands_main.add_command('del_func_hot_key', commands_main.del_func_hot_key)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('del_func', 'Удалить активное поле', 'del_func', hot_key='<Control-d>',
+                   hot_key_func='del_func_hot_key')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
