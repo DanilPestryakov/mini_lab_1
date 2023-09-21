@@ -31,11 +31,19 @@ class Entries:
         new_entry.icursor(0)
         new_entry.focus()
         new_entry.pack()
+        self.restore_plot_button()
+        self.entries_list.append(new_entry)
+
+    def del_entry(self, entry):
+        if entry in self.entries_list:
+            self.entries_list.remove(entry)
+        entry.destroy()
+
+    def restore_plot_button(self):
         plot_button = self.parent_window.get_button_by_name('plot')
         if plot_button:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
-        self.entries_list.append(new_entry)
 
 
 # class for plotting (класс для построения графиков)
@@ -148,10 +156,40 @@ class Commands:
         if plot_button:
             plot_button.pack_forget()
 
+    def is_plot_mode(self):
+        plot_button = self.parent_window.get_button_by_name('plot')
+        return not (plot_button and plot_button.winfo_ismapped())
+
     def add_func(self, *args, **kwargs):
         self.__forget_canvas()
         self.__forget_navigation()
         self.parent_window.entries.add_entry()
+
+    def del_func(self, *args, **kwargs):
+        entry = self.parent_window.focus_get()
+        if not entry or not isinstance(entry, Entry):
+            return
+
+        can_delete_entry = True
+        if entry.get():
+            mw = ModalWindow(self.parent_window, title='Удаление', labeltext='Удалить непустое поле?')
+            ok_button = Button(master=mw.top, text='OK', command=mw.ok)
+            cancel_button = Button(master=mw.top, text='CANCEL', command=mw.cancel)
+            mw.add_button(ok_button)
+            mw.add_button(cancel_button)
+
+            self.parent_window.wait_window(mw.top)
+            can_delete_entry = mw.result == 1
+
+        if not can_delete_entry:
+            return
+
+        self.parent_window.entries.del_entry(entry)
+
+        if self.is_plot_mode():
+            self.plot()
+        else:
+            self.parent_window.entries.restore_plot_button()
 
     def save_as(self):
         self._state.save_state()
@@ -185,6 +223,7 @@ class ModalWindow:
         self.top = Toplevel(parent)
         self.top.transient(parent)
         self.top.grab_set()
+        self.result = 0
         if len(title) > 0:
             self.top.title(title)
         if len(labeltext) == 0:
@@ -196,8 +235,12 @@ class ModalWindow:
         button.pack(pady=5)
 
     def cancel(self):
+        self.result = 0
         self.top.destroy()
 
+    def ok(self):
+        self.result = 1
+        self.top.destroy()
 
 # app class (класс приложения)
 class App(Tk):
@@ -247,11 +290,13 @@ if __name__ == "__main__":
     # command's registration (регистрация команд)
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
+    commands_main.add_command('del_func', commands_main.del_func)
     commands_main.add_command('save_as', commands_main.save_as)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('del_func', 'Удалить функцию', 'del_func', hot_key='<Control-d>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
