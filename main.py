@@ -7,6 +7,8 @@ import numpy as np
 from functools import partial
 from tkinter import *
 from tkinter.filedialog import asksaveasfile
+from tkinter import messagebox
+from tkinter import filedialog
 
 from matplotlib import pyplot as plt
 
@@ -72,7 +74,6 @@ class Plotter:
         self._last_plotted_figure = fig
         return fig
 
-
 # class for commands storage (класс для хранения команд)
 class Commands:
     class State:
@@ -96,6 +97,10 @@ class Commands:
         self._state = Commands.State()
         self.__empty_entry_counter = 0
         self.parent_window = None
+        # Добавление команды 'remove_entry'
+        self.add_command('remove_entry', self.remove_entry)
+        # Добавление команды 'load_saved_state'
+        self.add_command('load_saved_state', self.load_saved_state)
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
@@ -156,6 +161,60 @@ class Commands:
     def save_as(self):
         self._state.save_state()
         return self
+    def remove_entry(self):
+        active_entry = self.parent_window.focus_get()
+        if isinstance(active_entry, Entry):
+            if active_entry.get().strip():  # Проверка, что поле не пустое
+                confirmation = self.confirm_delete_dialog()
+                if confirmation:
+                    self.confirm_entry_removal(active_entry)
+            else:
+                self.confirm_entry_removal(active_entry)
+
+    def confirm_delete_dialog(self):
+        return messagebox.askyesno(
+            "Подтверждение удаления",
+            "Вы уверены, что хотите удалить непустое текстовое поле?"
+        )
+
+    def confirm_entry_removal(self, entry):
+        index = self.parent_window.entries.entries_list.index(entry)
+        if index >= 0:
+            entry.pack_forget()
+            self.parent_window.entries.entries_list.pop(index)
+
+            # Удаляем соответствующий график
+            if index < len(self.parent_window.plotter._last_plotted_list_of_function):
+                self.parent_window.plotter._last_plotted_list_of_function.pop(index)
+
+            # Очищаем область для графиков
+            self.parent_window.plotter._last_plotted_figure.clf()
+
+            # Перерисовываем оставшиеся графики
+            self.parent_window.plotter.plot(self.parent_window.plotter._last_plotted_list_of_function)
+
+    def load_saved_state(self):
+        file_path = filedialog.askopenfilename(defaultextension=".json")
+        if file_path:
+            with open(file_path, 'r') as file:
+                data = json.load(file)
+                self._state.list_of_function = data.get('list_of_function', [])
+
+                # Заполнение текстовых полей данными из сохраненного состояния
+                for func in self._state.list_of_function:
+                    entry = Entry(self.parent_window)
+                    entry.insert(0, func)
+                    entry.pack()
+                    self.parent_window.entries.entries_list.append(entry)
+
+                # Добавление пустых текстовых полей для отсутствующих функций
+                while len(self.parent_window.entries.entries_list) < len(self._state.list_of_function):
+                    entry = Entry(self.parent_window)
+                    entry.pack()
+                    self.parent_window.entries.entries_list.append(entry)
+
+                # Перерисовывание графиков с загруженными функциями
+                self.parent_window.plotter.plot(self._state.list_of_function)
 
 
 # class for buttons storage (класс для хранения кнопок)
@@ -211,6 +270,9 @@ class App(Tk):
         self.plotter.set_parent_window(self)
         self.commands.set_parent_window(self)
         self.buttons.set_parent_window(self)
+        # Добавление кнопки "Удалить" и назначение команды на удаление
+        self.add_button('remove_entry', 'Удалить', 'remove_entry')
+        self.bind('<Delete>', lambda event=None: self.commands.remove_entry())
 
     def add_button(self, name, text, command_name, *args, **kwargs):
         hot_key = kwargs.get('hot_key')
@@ -232,6 +294,7 @@ class App(Tk):
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
         menu.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Load saved state...", command=self.commands.get_command_by_name('load_saved_state'))
 
 
 if __name__ == "__main__":
