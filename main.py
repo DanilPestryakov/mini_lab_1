@@ -133,11 +133,8 @@ class Commands:
                 try:
                     with open(file_path, 'r') as file:
                         data = json.load(file)
-                        # Обработайте загруженные данные, например:
                         list_of_function = data.get('list_of_function', [])
                         return list_of_function
-                        # Далее, восстановите состояние приложения на основе данных
-                        # Например, установите значения полей и постройте графики.
                 except Exception as e:
                     # Обработка ошибок при загрузке данных из файла
                     print(f"Ошибка при загрузке данных из файла: {str(e)}")
