@@ -16,6 +16,17 @@ class Entries:
         new_entry.icursor(0)
         new_entry.focus()
         new_entry.pack()
+        new_entry.focus_get()
+        plot_button = self.parent_window.get_button_by_name('plot')
+        if plot_button:
+            plot_button.pack_forget()
+        self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
+        self.entries_list.append(new_entry)
+
+    def add_filled_entry(self, text):
+        new_entry = Entry(self.parent_window)
+        new_entry.insert(0, text)
+        new_entry.pack()
         plot_button = self.parent_window.get_button_by_name('plot')
         if plot_button:
             plot_button.pack_forget()

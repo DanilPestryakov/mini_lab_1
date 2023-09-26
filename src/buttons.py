@@ -1,6 +1,4 @@
 from tkinter import Button
-
-
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
     def __init__(self):

@@ -1,19 +1,23 @@
 from functools import partial
 from tkinter import Tk, BOTH, Menu
+from typing import Optional
+
+from src.buttons import Buttons
+from src.commands import Commands
+from src.entries import Entries
+from src.plotter import Plotter
 
 
 # app class (класс приложения)
 class App(Tk):
     def __init__(self, buttons, plotter, commands, entries):
         super().__init__()
-        self.buttons = buttons
-        self.plotter = plotter
-        self.commands = commands
-        self.entries = entries
-        self.entries.set_parent_window(self)
-        self.plotter.set_parent_window(self)
-        self.commands.set_parent_window(self)
-        self.buttons.set_parent_window(self)
+        self.buttons: Optional[Buttons] = buttons
+        self.plotter: Optional[Plotter] = plotter
+        self.commands: Optional[Commands] = commands
+        self.entries: Optional[Entries] = entries
+        for obj in [self.entries, self.commands, self.plotter, self.buttons]:
+            obj.set_parent_window(self)
 
     def add_button(self, name, text, command_name, *args, **kwargs):
         hot_key = kwargs.get('hot_key')
@@ -25,6 +29,10 @@ class App(Tk):
             self.bind(hot_key, callback)
         new_button.pack(fill=BOTH)
 
+    def add_hot_key(self, hot_key, command_name, *args, **kwargs):
+        callback = partial(self.commands.get_command_by_name(command_name), *args, **kwargs)
+        self.bind(hot_key, callback)
+
     def get_button_by_name(self, name):
         return self.buttons.buttons.get(name)
 
@@ -35,4 +43,6 @@ class App(Tk):
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...",
                               command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Open as...",
+                              command=self.commands.get_command_by_name('open_as'))
         menu.add_cascade(label="File", menu=file_menu)
