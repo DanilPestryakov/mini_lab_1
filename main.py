@@ -38,7 +38,7 @@ class Entries:
             new_entry.icursor(0)
             new_entry.focus()
             new_entry.pack()
-            new_entry.bind('<FocusIn>', self.set_active_entry)  # Bind a handler when receiving focus
+            new_entry.bind('<FocusIn>', self.set_active_entry)
             plot_button = self.parent_window.get_button_by_name('plot')
             if plot_button:
                 plot_button.pack_forget()
@@ -70,7 +70,6 @@ class Entries:
         def set_active_entry(event):
             self.active_entry = event.widget
 
-        # Bind methods to a class instance
         self.add_entry = add_entry
         self.delete_active_entry = delete_active_entry
         self.set_active_entry = set_active_entry
