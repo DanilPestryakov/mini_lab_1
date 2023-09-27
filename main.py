@@ -157,7 +157,42 @@ class Commands:
         self._state.save_state()
         return self
 
+    def delete_focus_entry(self):
+        focus_entry: Entry = self.parent_window.focus_get()
+        if not focus_entry:
+            return
+        for i, entry in enumerate(self.parent_window.entries.entries_list):
+            if focus_entry == entry:
+                if entry.get():
+                    if not self.choice_delete():
+                        return
+                self.parent_window.entries.entries_list.pop(i)
+                focus_entry.pack_forget()
+                break
+        if not self.parent_window.get_button_by_name("plot").winfo_exists():
+            self.plot()
 
+    def delete_last_entry(self, e):
+        if self.parent_window.entries.entries_list:
+            deleted_entry = self.parent_window.entries.entries_list[-1]
+            if deleted_entry.get():
+                if not self.choice_delete():
+                    return
+            deleted_entry.pack_forget()
+            self.parent_window.entries.entries_list.pop(-1)
+
+            if not self.parent_window.get_button_by_name("plot").winfo_exists():
+                self.plot()
+
+    def choice_delete(self):
+        mw = ModalWindow(parent=self.parent_window, title='Удаление непустой строки',
+                         labeltext="""Ты уверен, что хочешь удалить непустую строку?""")
+        ok_button = Button(master=mw.top, text='Да', command=mw.button_ok)
+        cancel_button = Button(master=mw.top, text='Нет', command=mw.button_cancel)
+        mw.add_button(ok_button)
+        mw.add_button(cancel_button)
+        self.parent_window.wait_window(mw.top)
+        return mw.choice
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
     def __init__(self):
@@ -169,6 +204,7 @@ class Buttons:
 
     def add_button(self, name, text, command):
         new_button = Button(master=self.parent_window, text=text, command=command)
+
         self.buttons[name] = new_button
         return new_button
 
@@ -196,6 +232,18 @@ class ModalWindow:
         button.pack(pady=5)
 
     def cancel(self):
+        self.top.destroy()
+
+    def add_button(self, button):
+        self.buttons.append(button)
+        button.pack(pady=5)
+
+    def button_ok(self):
+        self.choice = True
+        self.top.destroy()
+
+    def button_cancel(self):
+        self.choice = False
         self.top.destroy()
 
 
@@ -233,6 +281,10 @@ class App(Tk):
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
         menu.add_cascade(label="File", menu=file_menu)
 
+    def add_hot_key(self, hot_key, command_name, *args, **kwargs):
+        callback = partial(self.commands.get_command_by_name(command_name), *args, **kwargs)
+        self.bind(hot_key, callback)
+
 
 if __name__ == "__main__":
     # init buttons (создаем кнопки)
@@ -248,10 +300,15 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('delete_focus_entry', commands_main.delete_focus_entry)
+    commands_main.add_command('delete_last_entry', commands_main.delete_last_entry)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('delete_focus_entry', 'Удалить окно',
+                   'delete_focus_entry')
+    app.add_hot_key('<Alt-a>','delete_last_entry')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
