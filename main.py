@@ -51,7 +51,7 @@ class Plotter:
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
-    # plotting of graphics (построение графиков функций)
+    # plotting of graphics (построение графиков функций) ))
     def plot(self, list_of_function, title='Графики функций', x_label='x', y_label='y', need_legend=True):
         fig = plt.figure()
 
