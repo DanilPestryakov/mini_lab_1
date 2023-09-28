@@ -1,22 +1,19 @@
 import json
 import matplotlib
-
 import numexpr as ne
 import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, asksaveasfile, askopenfile
 
 from matplotlib import pyplot as plt
 
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
                                                NavigationToolbar2Tk)
-
 matplotlib.use('TkAgg')
 
 
-# class for entries storage (класс для хранения текстовых полей)
 class Entries:
     def __init__(self):
         self.entries_list = []
@@ -25,9 +22,9 @@ class Entries:
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
-    # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
+    def add_entry(self, func=""):
         new_entry = Entry(self.parent_window)
+        new_entry.insert(0, func)
         new_entry.icursor(0)
         new_entry.focus()
         new_entry.pack()
@@ -37,8 +34,28 @@ class Entries:
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
 
+    def delete_text_line(self):
+       if len(self.entries_list) == 0:
+            wn = ModalWindow(self.parent_window, title='Нет существующих полей', labeltext='Нет полей, которые можно удалить')
+            but = Button(master=wn.top, text='Ok', command=wn.cancel )
+            wn.add_button(but)
+       focus = self.parent_window.focus_get()
+       if type(focus) == Entry:
+                if focus.get() != "":
+                    check_win = ModalWindow(self.parent_window, title='Удалить поле для ввода функции', labeltext='У вас непустое поле. Вы уверены, что хотите продолжить?')
+                    command = partial(check_win.continue_to_delete_text_line, entry=focus, entries_list=self.entries_list)
+                    yes = Button(master=check_win.top, text='Продолжить', command=command)
+                    check_win.add_button(yes)
+                    no = Button(master=check_win.top, text="Отмена", command=check_win.cancel)
+                    check_win.add_button(no)
+                else:
+                    self.entries_list.pop(self.entries_list.index(focus)).destroy()
+                plot_but = self.parent_window.get_button_by_name('plot')
+                if plot_but:
+                    plot_but.pack_forget()
+                self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
 
-# class for plotting (класс для построения графиков)
+
 class Plotter:
     def __init__(self, x_min=-20, x_max=20, dx=0.01):
         self.x_min = x_min
@@ -50,8 +67,8 @@ class Plotter:
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
-
     # plotting of graphics (построение графиков функций)
+
     def plot(self, list_of_function, title='Графики функций', x_label='x', y_label='y', need_legend=True):
         fig = plt.figure()
 
@@ -73,11 +90,11 @@ class Plotter:
         return fig
 
 
-# class for commands storage (класс для хранения команд)
 class Commands:
     class State:
         def __init__(self):
             self.list_of_function = []
+            self.list_of_saved_functions = []
 
         def save_state(self):
             tmp_dict = {'list_of_function': self.list_of_function}
@@ -117,7 +134,6 @@ class Commands:
     def plot(self, *args, **kwargs):
         def is_not_blank(s):
             return bool(s and not s.isspace())
-
         self._state.reset_state()
         list_of_function = []
         for entry in self.parent_window.entries.entries_list:
@@ -157,8 +173,27 @@ class Commands:
         self._state.save_state()
         return self
 
+    def save_session(self):
+        self.__forget_canvas()
+        for entry in self.parent_window.entries.entries_list:
+            get_func_str = entry.get()
+            self._state.list_of_saved_functions.append(get_func_str)
 
-# class for buttons storage (класс для хранения кнопок)
+    def return_session(self):
+        self.__forget_canvas()
+        for entry in self.parent_window.entries.entries_list:
+            entry.destroy()
+        self.parent_window.entries.entries_list = []
+        for func in self._state.list_of_saved_functions:
+            self.parent_window.entries.add_entry(func)
+        self.parent_window.commands.plot()
+
+    def delete_text_line(self, *args, **kwargs):
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.parent_window.entries.delete_text_line()
+
+
 class Buttons:
     def __init__(self):
         self.buttons = {}
@@ -178,7 +213,6 @@ class Buttons:
             button.pack_forget()
 
 
-# class for generate modal windows (класс для генерации модальных окон)
 class ModalWindow:
     def __init__(self, parent, title, labeltext=''):
         self.buttons = []
@@ -197,6 +231,11 @@ class ModalWindow:
 
     def cancel(self):
         self.top.destroy()
+
+    def continue_to_delete_text_line(self, entry, entries_list):
+        entry.delete(0, END)
+        self.top.destroy()
+        entries_list.pop(entries_list.index(entry)).destroy()
 
 
 # app class (класс приложения)
@@ -231,6 +270,8 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Save session...", command=self.commands.get_command_by_name('save_session'))
+        file_menu.add_command(label="Return session...", command=self.commands.get_command_by_name('return_session'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -248,10 +289,16 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('delete_text_line', commands_main.delete_text_line)
+    commands_main.add_command('save_session', commands_main.save_session)
+    commands_main.add_command('return_session', commands_main.return_session)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('delete_text_line', 'Удалить поле', 'delete_text_line', hot_key='<Control-x>')
+    app.add_button('save_session', 'Сохранить текущую сессию', 'save_session', hot_key='<Control-c>')
+    app.add_button('return_session', 'Восстановить сохраненную сессию', 'return_session', hot_key='<Control-v>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
