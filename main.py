@@ -1,12 +1,13 @@
 import json
 import matplotlib
+import os
 
 import numexpr as ne
 import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile,  askopenfile
 
 from matplotlib import pyplot as plt
 
@@ -38,6 +39,26 @@ class Entries:
         self.entries_list.append(new_entry)
 
 
+    def delete_entry(self):
+        if self.entries_list:
+            active_entry = self.entries_list[-1]
+            entry_text = active_entry.get()
+            if entry_text.strip():
+                modWin = ModalWindow(self.parent_window, title='Удаление непустого поля', labeltext='Удалить?')
+                yes_Click = Button(master=modWin.top, text="Da", command=self._delete_entry)
+                no_Click = Button(master=modWin.top, text="No", command=modWin.cancel)
+                modWin.add_button(yes_Click)
+                modWin.add_button(no_Click)
+            else:
+                active_entry.destroy()
+                self.entries_list.pop()
+
+    def _delete_entry(self):
+        if self.entries_list:
+            active_entry = self.entries_list[-1]
+            active_entry.destroy()
+            self.entries_list.pop()
+
 # class for plotting (класс для построения графиков)
 class Plotter:
     def __init__(self, x_min=-20, x_max=20, dx=0.01):
@@ -48,6 +69,23 @@ class Plotter:
         self._last_plotted_figure = None
         self.parent_window = None
 
+    def load_graph(self, filename):
+        try:
+            with open(filename, "r") as file:
+                data = json.load(file)
+                list_of_function = data.get("list_of_function")
+                if list_of_function:
+                    self.plot(list_of_function)
+        except Exception as e:
+            print("error")
+
+    def save_graph(self, filename):
+        try:
+            with open(filename, "w") as file:
+                data = {"list_of_function": self._last_plotted_list_of_function}
+                json.dump(data, file)
+        except Exception as e:
+            print("error")
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
@@ -105,6 +143,12 @@ class Commands:
 
     def get_command_by_name(self, command_name):
         return self.command_dict[command_name]
+
+    def delete_entry(self):
+        self.parent_window.entries.delete_entry()
+
+    def load_graph(self, filename):
+        self.parent_window.plotter.load_graph(filename)
 
     def __forget_canvas(self):
         if self.__figure_canvas is not None:
@@ -211,12 +255,68 @@ class App(Tk):
         self.plotter.set_parent_window(self)
         self.commands.set_parent_window(self)
         self.buttons.set_parent_window(self)
+        self.add_button('delete_entry', 'Удалить поле', 'delete_entry', hot_key='<Control-d>')
+        self.bind("<F1>", self.delete_entry_and_graph)
+        self.load_graph()
 
-    def add_button(self, name, text, command_name, *args, **kwargs):
+    def exit_app(self):
+        self.save_graph()
+        self.destroy()
+    def create_menu(self):
+        menu = Menu(self)
+        self.config(menu=menu)
+        file_menu = Menu(menu)
+        file_menu.add_command(label="Load", command=self.load_graph)
+        file_menu.add_command(label="save", command=self.save_graph)
+        menu.add_cascade(label="File", menu=file_menu)
+        menu.add_command(label="Exit", command=self.exit_app)
+
+    def load_graph(self):
+        try:
+            filename = askopenfile(defaultextension="app_graph.json")
+            if filename:
+                with open(filename, "r") as file:
+                    graph = json.load(file)
+                    self.entries.add_entry()
+                    for entry, func_str in zip(self.entries.entries_list, graph.get("list_of_function", [])):
+                        entry.insert(0, func_str)
+        except Exception as e:
+            print("Error")
+
+    def save_graph(self):
+        try:
+            filename = asksaveasfile(defaultextension="app_graph.json")
+            if filename:
+                graph = {"list_of_function": [entry.get() for entry in self.entries.entries_list]}
+                with open(filename, "w") as file:
+                    json.dump(graph, file)
+        except Exception as e:
+            print("Error ")
+
+    def delete_entry_and_graph(self, event=None):
+        if self.commands._state.figure:
+            self.commands._state.figure.clear()
+            self.commands._state.figure = None
+        self.entries.delete_entry()
+
+    def load_graph(self):
+        filename = askopenfile(defaultextension=".json")
+        if filename:
+            self.commands.load_graph(filename)
+
+    def save_graph(self):
+        filename = asksaveasfile(defaultextension=".json")
+        if filename:
+            self.commands.save_graph(filename)
+
+    def add_button(self, name, text, command_name=None, *args, **kwargs):
         hot_key = kwargs.get('hot_key')
         if hot_key:
             kwargs.pop('hot_key')
-        callback = partial(self.commands.get_command_by_name(command_name), *args, **kwargs)
+        if command_name:
+            callback = partial(self.commands.get_command_by_name(command_name), *args, **kwargs)
+        else:
+            callback = None
         new_button = self.buttons.add_button(name=name, text=text, command=callback)
         if hot_key:
             self.bind(hot_key, callback)
@@ -233,6 +333,9 @@ class App(Tk):
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
         menu.add_cascade(label="File", menu=file_menu)
 
+    def delete_entry(self):
+        self.entries.delete_entry()
+
 
 if __name__ == "__main__":
     # init buttons (создаем кнопки)
@@ -248,6 +351,7 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('delete_entry', commands_main.delete_entry)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
