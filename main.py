@@ -1,22 +1,17 @@
 import json
 import matplotlib
-
 import numexpr as ne
 import numpy as np
-
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
-
+from tkinter.filedialog import asksaveasfile, askopenfile
+from tkinter import messagebox
 from matplotlib import pyplot as plt
-
-from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
-                                               NavigationToolbar2Tk)
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
 matplotlib.use('TkAgg')
 
-
-# class for entries storage (класс для хранения текстовых полей)
+# Класс для хранения текстовых полей
 class Entries:
     def __init__(self):
         self.entries_list = []
@@ -25,8 +20,8 @@ class Entries:
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
-    # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
+    # Добавление нового текстового поля
+    def add_entry(self, initial_text=""):
         new_entry = Entry(self.parent_window)
         new_entry.icursor(0)
         new_entry.focus()
@@ -36,9 +31,35 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+        new_entry.insert(0, initial_text)  # Устанавливаем начальный текст
 
+    # Удаление активного текстового поля
+    def delete_active_entry(self):
+        if self.entries_list:
+            active_entry = self.parent_window.focus_get()
+            if active_entry in self.entries_list:
+                get_func_str = active_entry.get()
+                if get_func_str.strip():  # Проверка, что текстовое поле не пустое
+                    # Отображаем модальное окно с запросом подтверждения удаления
+                    confirm = messagebox.askyesno("Подтверждение удаления", "Вы уверены, что хотите удалить непустое текстовое поле?")
+                    if not confirm:
+                        return  # Если пользователь отменил удаление, ничего не делаем
+                active_entry.pack_forget()
+                self.entries_list.remove(active_entry)
+                self.parent_window.commands.plot()
 
-# class for plotting (класс для построения графиков)
+    # Удаление последнего текстового поля
+    def delete_last_entry(self):
+        if self.entries_list:
+            last_entry = self.entries_list.pop()
+            last_entry.pack_forget()
+            self.parent_window.commands.plot()
+
+    # Получение текстовых полей как список строк
+    def get_entries_as_list(self):
+        return [entry.get() for entry in self.entries_list]
+
+# Класс для построения графиков
 class Plotter:
     def __init__(self, x_min=-20, x_max=20, dx=0.01):
         self.x_min = x_min
@@ -51,7 +72,7 @@ class Plotter:
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
-    # plotting of graphics (построение графиков функций)
+    # Построение графиков функций
     def plot(self, list_of_function, title='Графики функций', x_label='x', y_label='y', need_legend=True):
         fig = plt.figure()
 
@@ -72,8 +93,7 @@ class Plotter:
         self._last_plotted_figure = fig
         return fig
 
-
-# class for commands storage (класс для хранения команд)
+# Класс для хранения команд
 class Commands:
     class State:
         def __init__(self):
@@ -127,12 +147,13 @@ class Commands:
                 list_of_function.append(get_func_str)
             else:
                 if self.__empty_entry_counter == 0:
-                    mw = ModalWindow(self.parent_window, title='Пустая строка', labeltext='Это пример модального окна, '
-                                                                                          'возникающий, если ты ввел '
-                                                                                          'пустую '
-                                                                                          'строку. С этим ничего '
-                                                                                          'делать не нужно. '
-                                                                                          'Просто нажми OK :)')
+                    mw = ModalWindow(self.parent_window, title='Пустая строка',
+                                     labeltext='Это пример модального окна, '
+                                               'возникающий, если ты ввел '
+                                               'пустую '
+                                               'строку. С этим ничего '
+                                               'делать не нужно. '
+                                               'Просто нажми OK :)')
                     ok_button = Button(master=mw.top, text='OK', command=mw.cancel)
                     mw.add_button(ok_button)
                     self.__empty_entry_counter = 1
@@ -157,8 +178,21 @@ class Commands:
         self._state.save_state()
         return self
 
+    # Загрузка сохраненной сессии из файла JSON
+    def load_session(self):
+        file_in = askopenfile(defaultextension=".json", filetypes=[("JSON Files", "*.json")])
+        if file_in:
+            try:
+                data = json.load(file_in)
+                if 'list_of_function' in data:
+                    list_of_function = data['list_of_function']
+                    for func_str in list_of_function:
+                        self.parent_window.entries.add_entry(func_str)
+                    self.parent_window.commands.plot()
+            except json.JSONDecodeError:
+                messagebox.showerror("Ошибка", "Не удалось загрузить сессию из файла")
 
-# class for buttons storage (класс для хранения кнопок)
+# Класс для хранения кнопок
 class Buttons:
     def __init__(self):
         self.buttons = {}
@@ -177,8 +211,7 @@ class Buttons:
         if button:
             button.pack_forget()
 
-
-# class for generate modal windows (класс для генерации модальных окон)
+# Класс для генерации модальных окон
 class ModalWindow:
     def __init__(self, parent, title, labeltext=''):
         self.buttons = []
@@ -198,8 +231,7 @@ class ModalWindow:
     def cancel(self):
         self.top.destroy()
 
-
-# app class (класс приложения)
+# Класс приложения
 class App(Tk):
     def __init__(self, buttons, plotter, commands, entries):
         super().__init__()
@@ -231,30 +263,42 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Load session...", command=self.commands.get_command_by_name('load_session'))  # Добавляем команду загрузки сессии
         menu.add_cascade(label="File", menu=file_menu)
 
-
 if __name__ == "__main__":
-    # init buttons (создаем кнопки)
+    # Инициализация кнопок
     buttons_main = Buttons()
-    # init plotter (создаем отрисовщик графиков)
+    # Инициализация отрисовщика графиков
     plotter_main = Plotter()
-    # init commands for executing on buttons or hot keys press
-    # (создаем команды, которые выполняются при нажатии кнопок или горячих клавиш)
+    # Инициализация команд для выполнения при нажатии кнопок или горячих клавиш
     commands_main = Commands()
-    # init entries (создаем текстовые поля)
+    # Инициализация текстовых полей
     entries_main = Entries()
-    # command's registration (регистрация команд)
+    # Регистрация команд
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
-    # init app (создаем экземпляр приложения)
+    commands_main.add_command('load_session', commands_main.load_session)  # Регистрация команды загрузки сессии
+    commands_main.add_command('delete_active_entry', entries_main.delete_active_entry)
+    commands_main.add_command('delete_last_entry', entries_main.delete_last_entry)
+    # Инициализация приложения
     app = App(buttons_main, plotter_main, commands_main, entries_main)
-    # init add func button (добавляем кнопку добавления новой функции)
+    # Добавление кнопки добавления новой функции
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
-    # init first entry (создаем первое поле ввода)
+    # Добавление кнопки удаления активного текстового поля
+    app.add_button('delete_entry', 'Удалить текстовое поле', 'delete_active_entry', hot_key='<Control-d>')
+    # Добавление кнопки удаления последнего текстового поля
+    app.add_button('delete_last_entry', 'Удалить последнее текстовое поле', 'delete_last_entry', hot_key='<Control-n>')
+    # Добавление первого текстового поля
     entries_main.add_entry()
     app.create_menu()
-    # добавил комментарий для коммита
-    # application launch (запуск "вечного" цикла приложеня)
+
+    # Добавление обработчика для комбинации клавиш Ctrl + D
+    app.bind('<Control-d>', lambda event: app.commands.get_command_by_name('delete_active_entry')())
+
+    # Добавление обработчика для комбинации клавиш Ctrl + N
+    app.bind('<Control-n>', lambda event: app.commands.get_command_by_name('delete_last_entry')())
+
+    # Запуск приложения
     app.mainloop()
