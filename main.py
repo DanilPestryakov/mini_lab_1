@@ -48,11 +48,19 @@ class Entries:
                 self.entries_list.remove(active_entry)
                 self.parent_window.commands.plot()
 
-    # Удаление последнего текстового поля
+        # Удаление последнего текстового поля
     def delete_last_entry(self):
         if self.entries_list:
-            last_entry = self.entries_list.pop()
+            last_entry = self.entries_list[-1]  # Получаем последнее текстовое поле
+            get_func_str = last_entry.get()
+            if get_func_str.strip():  # Проверка, что текстовое поле не пустое
+                # Отображаем модальное окно с запросом подтверждения удаления
+                confirm = messagebox.askyesno("Подтверждение удаления",
+                                              "Вы уверены, что хотите удалить непустое текстовое поле?")
+                if not confirm:
+                    return  # Если пользователь отменил удаление, ничего не делаем
             last_entry.pack_forget()
+            self.entries_list.pop()  # Удаляем последнее текстовое поле
             self.parent_window.commands.plot()
 
     # Получение текстовых полей как список строк
