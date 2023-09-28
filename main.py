@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfilename
 
 from matplotlib import pyplot as plt
 
@@ -36,6 +36,41 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+
+    def ask_to_del(self):
+        entry = self.parent_window.focus_get()
+
+        if entry not in self.entries_list:
+            return
+
+        text = entry.get()
+
+        if not text or text.isspace():
+            self.del_entry(entry)
+            return
+
+        mw = ModalWindow(self.parent_window, title='Непустая строка', labeltext='Точно удалить функцию?')
+        yes_button = Button(master=mw.top, text='OK', command=mw.cancel)
+        mw.add_button(yes_button)
+
+        yes_button.bind('<Button-1>', lambda event: self.del_entry(entry))
+        self.parent_window.wait_window(mw.top)
+
+    def del_entry(self, entry):
+        entry.destroy()
+        self.entries_list.remove(entry)
+
+    def add_entries_from_json(self, list_of_function):
+        for func in list_of_function:
+            new_entry = Entry(self.parent_window)
+
+            new_entry.icursor(0)
+            new_entry.focus()
+            new_entry.pack()
+            new_entry.insert(0, func)
+            self.entries_list.append(new_entry)
+
+
 
 
 # class for plotting (класс для построения графиков)
@@ -153,6 +188,30 @@ class Commands:
         self.__forget_navigation()
         self.parent_window.entries.add_entry()
 
+    def del_func(self):
+        self.parent_window.entries.ask_to_del()
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.plot()
+
+    def upload_file(self):
+        file_in = askopenfilename(defaultextension=".json")
+
+        if file_in is not None:
+            with open(file_in, "r") as file:
+                json_dict = json.load(file)
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self._state.reset_state()
+
+        for entry in self.parent_window.entries.entries_list:
+            entry.destroy()
+        self.parent_window.entries.entries_list = []
+
+        self._state.list_of_function = json_dict['list_of_function']
+        self.parent_window.entries.add_entries_from_json(self._state.list_of_function)
+        self.plot()
+
     def save_as(self):
         self._state.save_state()
         return self
@@ -231,6 +290,8 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Upload", command=self.commands.get_command_by_name('upload_file'))
+
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -247,14 +308,18 @@ if __name__ == "__main__":
     # command's registration (регистрация команд)
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
+    commands_main.add_command('del_func', commands_main.del_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('upload_file', commands_main.upload_file)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('del_func', 'Удалить функцию', 'del_func', hot_key='<Control-d>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
     # добавил комментарий для коммита
     # application launch (запуск "вечного" цикла приложеня)
     app.mainloop()
+
