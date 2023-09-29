@@ -31,6 +31,10 @@ class App(Tk):
         self.plotter.set_parent_window(self)
         self.commands.set_parent_window(self)
         self.buttons.set_parent_window(self)
+        self.protocol("WM_DELETE_WINDOW", self.on_close)  # Add window closing callback
+
+    def on_close(self):
+        self.quit()  # Terminate the Tkinter application
 
     def add_button(self, name, text, command_name, *args, **kwargs):
         hot_key = kwargs.get('hot_key')
