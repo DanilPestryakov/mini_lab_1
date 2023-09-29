@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfilename
 
 from matplotlib import pyplot as plt
 
@@ -37,6 +37,31 @@ class Entries:
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
 
+    def delete_entry(self, d_entry):
+        d_entry.destroy()
+        self.entries_list.remove(d_entry)
+
+    def asking_del(self):
+        if len(self.entries_list) > 0:
+            d_entry = self.parent_window.focus_get()
+            if d_entry in self.entries_list:
+                if not d_entry.get() or d_entry.get().isspace():
+                    self.delete_entry(d_entry)
+                else:
+                    mw = ModalWindow(self.parent_window, title='Подтверждение', labeltext='Точно хотите удалить?)')
+                    ok_button = Button(master=mw.top, text='OK', command=mw.cancel)
+                    mw.add_button(ok_button)
+                    ok_button.bind('<Button-1>', lambda event: self.delete_entry(d_entry))
+                    self.parent_window.wait_window(mw.top)
+
+    def add_from_json(self, list_of_function):
+        for func in list_of_function:
+            new_entry = Entry(self.parent_window)
+            new_entry.icursor(0)
+            new_entry.focus()
+            new_entry.pack()
+            new_entry.insert(0, func)
+            self.entries_list.append(new_entry)
 
 # class for plotting (класс для построения графиков)
 class Plotter:
@@ -157,6 +182,26 @@ class Commands:
         self._state.save_state()
         return self
 
+    def delete_func(self, *args, **kwargs):
+        self.parent_window.entries.asking_del()
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.plot()
+
+    def import_data(self):
+        file_in = askopenfilename(defaultextension='.json')
+        if file_in is not None:
+            with open(file_in, 'r') as file:
+                json_data = json.load(file)
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self._state.reset_state()
+        for entry in self.parent_window.entries.entries_list:
+            entry.destroy()
+        self.parent_window.entries.entries_list = []
+        self._state.list_of_function = json_data['list_of_function']
+        self.parent_window.entries.add_from_json(self._state.list_of_function)
+        self.plot()
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
@@ -231,6 +276,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Import data", command=self.commands.get_command_by_name('import_data'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -248,13 +294,16 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('delete_func', commands_main.delete_func)
+    commands_main.add_command('import_data', commands_main.import_data)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('delete_func', 'Удалить функцию', 'delete_func', hot_key='<Control-d>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
     # добавил комментарий для коммита
-    # application launch (запуск "вечного" цикла приложеня)
+    # application launch (запуск "вечного" цикла приложения)
     app.mainloop()
