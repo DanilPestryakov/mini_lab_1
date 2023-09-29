@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfile
 
 from matplotlib import pyplot as plt
 
@@ -36,6 +36,35 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+    
+    # deleting of active entry (Удаление активного текстового поля)
+    def delete_active_entry(self):
+        if not self.entries_list:
+            return
+        
+        active_entry = self.parent_window.focus_get()
+        if active_entry not in self.entries_list:
+            return 
+        
+        get_func_str = active_entry.get()
+        if not get_func_str.strip():
+            active_entry.pack_forget(), 
+            self.entries_list.remove(active_entry)
+            self.parent_window.commands.plot()
+            return
+        
+        mw = ModalWindow(self.parent_window, title='Подтверждение удаления', 
+                         labeltext= 'Вы уверены, что хотите удалить непустое активное текстовое поле?')
+        yes_button = Button(master=mw.top, text='Да', command=lambda: [mw.cancel(), 
+                                                                       active_entry.pack_forget(), 
+                                                                       self.entries_list.remove(active_entry),
+                                                                       self.parent_window.commands.plot()])
+        no_button  = Button(master=mw.top, text='Нет', command=mw.cancel)
+        mw.add_button(yes_button)
+        mw.add_button(no_button)
+
+    def get_entries_as_list(self):
+        return [entry.get() for entry in self.entries_list]
 
 
 # class for plotting (класс для построения графиков)
@@ -157,6 +186,21 @@ class Commands:
         self._state.save_state()
         return self
 
+     # Loading a saved session from a JSON file (Загрузка сохраненной сессии из файла JSON)
+    def load_session(self):
+        file_in = askopenfile(defaultextension=".json", filetypes=[("JSON Files", "*.json")])
+        if file_in:
+            try:
+                data = json.load(file_in)
+                if 'list_of_function' in data:
+                    list_of_function = data['list_of_function']
+                    for func_str in list_of_function:
+                        self.parent_window.entries.add_entry(func_str)
+                    self.parent_window.commands.plot()
+            except json.JSONDecodeError:
+                mw = ModalWindow(self.parent_window, title='Ошибка', labeltext='Не удалось загрузить сессию из файла')
+                ok_button = Button(master=mw.top, text='Ok', command=mw.cancel)
+                mw.add_button(ok_button)
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
@@ -231,6 +275,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Load session...", command=self.commands.get_command_by_name('load_session'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -248,13 +293,21 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('load_session', commands_main.load_session)  # Регистрация команды загрузки сессии
+    commands_main.add_command('delete_active_entry', entries_main.delete_active_entry)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    # add a button to delete the active text field (добавляем кнопку удаления активного текстового поля)
+    app.add_button('delete_entry', 'Удалить текстовое поле', 'delete_active_entry', hot_key='<Control-d>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
+
+    # add a handler for the Ctrl + D key combination (добавляем обработчика для комбинации клавиш Ctrl + D)
+    app.bind('<Control-d>', lambda event: app.commands.get_command_by_name('delete_active_entry')())
+
     # добавил комментарий для коммита
     # application launch (запуск "вечного" цикла приложеня)
     app.mainloop()
