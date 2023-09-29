@@ -73,13 +73,8 @@ class Commands:
                 list_of_function.append(get_func_str)
             else:
                 if self.__empty_entry_counter == 0:
-                    mw = ModalWindow(self.parent_window, title='Пустая строка', labeltext='Это пример модального окна, '
-                                                                                          'возникающий, если ты ввел '
-                                                                                          'пустую '
-                                                                                          'строку. С этим ничего '
-                                                                                          'делать не нужно. '
-                                                                                          'Просто нажми OK :)')
-                    ok_button = Button(master=mw.top, text='OK', command=mw.cancel)
+                    mw = ModalWindow(self.parent_window, title='Пустая строка', labeltext='Пусто')
+                    ok_button = Button(master=mw.top, text='да', command=mw.cancel)
                     mw.add_button(ok_button)
                     self.__empty_entry_counter = 1
         self.__empty_entry_counter = 0
@@ -98,6 +93,11 @@ class Commands:
         self.__forget_canvas()
         self.__forget_navigation()
         self.parent_window.entries.add_entry()
+
+    def del_func(self, *args, **kwargs):
+        self.parent_window.entries.delete_entry()
+        self.parent_window.plotter.clear_plot()
+        self.parent_window.commands.plot()  # Re-plot the remaining functions
 
     def save_as(self):
         self._state.save_state()

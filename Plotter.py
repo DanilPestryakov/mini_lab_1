@@ -25,7 +25,7 @@ class Plotter:
         self.x_min = x_min
         self.x_max = x_max
         self.dx = dx
-        self._last_plotted_list_of_function = None
+        self._last_plotted_list_of_function = []
         self._last_plotted_figure = None
         self.parent_window = None
 
@@ -52,3 +52,10 @@ class Plotter:
         self._last_plotted_list_of_function = list_of_function
         self._last_plotted_figure = fig
         return fig
+
+    def clear_plot(self):
+        # Clear the previous plot
+        if self._last_plotted_figure is not None:
+            self._last_plotted_figure.clear()
+            self._last_plotted_figure = None
+        self._last_plotted_list_of_function = []

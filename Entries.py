@@ -41,3 +41,13 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+
+    # deleting of active entry (удаление активного текстового поля)
+    def delete_entry(self):
+        if len(self.entries_list) > 0:
+            self.entries_list[-1].destroy()
+            self.entries_list.pop()
+            plot_button = self.parent_window.get_button_by_name('plot')
+            if plot_button:
+                plot_button.pack_forget()
+            self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')

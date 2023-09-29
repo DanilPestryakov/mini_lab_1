@@ -56,3 +56,6 @@ class App(Tk):
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
         menu.add_cascade(label="File", menu=file_menu)
+
+        # Bind delete function button to clear the plot
+        self.bind('<Control-d>', lambda event: self.commands.del_func())
