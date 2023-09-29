@@ -7,6 +7,7 @@ import numpy as np
 from functools import partial
 from tkinter import *
 from tkinter.filedialog import asksaveasfile
+from tkinter import messagebox
 
 from matplotlib import pyplot as plt
 
@@ -14,7 +15,6 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
                                                NavigationToolbar2Tk)
 
 matplotlib.use('TkAgg')
-
 
 # class for entries storage (класс для хранения текстовых полей)
 class Entries:
@@ -36,6 +36,18 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+
+    def remove_entry(self):
+        self.active_entry = self.parent_window.focus_get()  # Сохраняем активное поле
+        if self.active_entry in self.entries_list:
+            if self.active_entry.get():
+                confirm = messagebox.askyesno("Подтверждение", "Удалить поле?")
+                if not confirm:
+                    return
+            self.entries_list.remove(self.active_entry)
+            self.active_entry.destroy()
+        else:
+            messagebox.showwarning("ошибка", "выделенного поля нет")
 
 
 # class for plotting (класс для построения графиков)
@@ -110,6 +122,9 @@ class Commands:
         if self.__figure_canvas is not None:
             self.__figure_canvas.get_tk_widget().pack_forget()
 
+
+
+
     def __forget_navigation(self):
         if self.__navigation_toolbar is not None:
             self.__navigation_toolbar.pack_forget()
@@ -152,6 +167,10 @@ class Commands:
         self.__forget_canvas()
         self.__forget_navigation()
         self.parent_window.entries.add_entry()
+
+    def delete_func(self, *args, **kwargs):
+        self.parent_window.entries.remove_entry()
+        self.plot()
 
     def save_as(self):
         self._state.save_state()
@@ -235,26 +254,17 @@ class App(Tk):
 
 
 if __name__ == "__main__":
-    # init buttons (создаем кнопки)
     buttons_main = Buttons()
-    # init plotter (создаем отрисовщик графиков)
     plotter_main = Plotter()
-    # init commands for executing on buttons or hot keys press
-    # (создаем команды, которые выполняются при нажатии кнопок или горячих клавиш)
     commands_main = Commands()
-    # init entries (создаем текстовые поля)
     entries_main = Entries()
-    # command's registration (регистрация команд)
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
+    commands_main.add_command('delete_func', commands_main.delete_func)
     commands_main.add_command('save_as', commands_main.save_as)
-    # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
-    # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
-    # init first entry (создаем первое поле ввода)
+    app.add_button('delete_func', 'Уничтожить функцию', 'delete_func', hot_key='<Control-z>')
     entries_main.add_entry()
     app.create_menu()
-    # добавил комментарий для коммита
-    # application launch (запуск "вечного" цикла приложеня)
     app.mainloop()
