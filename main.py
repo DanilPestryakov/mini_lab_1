@@ -7,6 +7,7 @@ import numpy as np
 from functools import partial
 from tkinter import *
 from tkinter.filedialog import asksaveasfile
+from tkinter import messagebox
 
 from matplotlib import pyplot as plt
 
@@ -14,7 +15,6 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
                                                NavigationToolbar2Tk)
 
 matplotlib.use('TkAgg')
-
 
 # class for entries storage (класс для хранения текстовых полей)
 class Entries:
@@ -36,6 +36,18 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+
+    def remove_entry(self):
+        self.active_entry = self.parent_window.focus_get()  # Сохраняем активное поле
+        if self.active_entry in self.entries_list:
+            if self.active_entry.get():
+                confirm = messagebox.askyesno("Подтверждение", "Удалить поле с текстом?")
+                if not confirm:
+                    return
+            self.entries_list.remove(self.active_entry)
+            self.active_entry.destroy()
+        else:
+            messagebox.showwarning("Внимание", "Активное поле не найдено!")
 
 
 # class for plotting (класс для построения графиков)
@@ -153,6 +165,10 @@ class Commands:
         self.__forget_navigation()
         self.parent_window.entries.add_entry()
 
+    def delete_func(self, *args, **kwargs):
+        self.parent_window.entries.remove_entry()
+        self.plot()
+
     def save_as(self):
         self._state.save_state()
         return self
@@ -247,11 +263,13 @@ if __name__ == "__main__":
     # command's registration (регистрация команд)
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
+    commands_main.add_command('delete_func', commands_main.delete_func)
     commands_main.add_command('save_as', commands_main.save_as)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('delete_func', 'Удалить функцию', 'delete_func', hot_key='<Control-z>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
