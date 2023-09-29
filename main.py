@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfile
 
 from matplotlib import pyplot as plt
 
@@ -21,13 +21,18 @@ class Entries:
     def __init__(self):
         self.entries_list = []
         self.parent_window = None
-
+        self.delete_entry = None
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
     # adding of new entry (добавление нового текстового поля)
     def add_entry(self):
         new_entry = Entry(self.parent_window)
+
+        def delete_entery(*args, **kwargs):
+            self.delete_entry = new_entry
+
+        new_entry.bind('<FocusIn>', delete_entery)
         new_entry.icursor(0)
         new_entry.focus()
         new_entry.pack()
@@ -37,6 +42,62 @@ class Entries:
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
 
+    def delete_func(self):
+        if self.delete_entry is None:
+            return
+        if len(self.delete_entry.get()) > 0:
+            self.__modal_deleting_completed_field()
+        if len(self.delete_entry.get()) == 0:
+            self.__modal_last_field()
+        else:
+            self.__delete_field()
+
+    def __delete_field(self):
+        self.delete_entry.pack_forget()
+        self.entries_list.remove(self.delete_entry)
+        self.delete_entry = None
+        # redrawing plot button
+        plot_button = self.parent_window.get_button_by_name('plot')
+        if plot_button:
+            plot_button.pack_forget()
+        self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
+
+    def __modal_deleting_completed_field(self):
+        mw = ModalWindow(self.parent_window, title='Удаление', labeltext= 'Вы действительно хотите удалить непустую строку?')
+        def on_click(is_yes):
+            def func(*args, **kwargs):
+                mw.cancel()
+                if is_yes:
+                    self.__delete_field()
+
+            return func
+
+        yes_button = Button(master=mw.top, text='Да', command=on_click(True))
+        no_button = Button(master=mw.top, text='Нет', command=on_click(False))
+        mw.add_button(yes_button)
+        mw.add_button(no_button)
+    def __modal_last_field(self):
+        mw = ModalWindow(self.parent_window, title='Удаление',
+                         labeltext='Вы действительно хотите удалить последнее поле?')
+
+        def on_click(is_yes):
+            def func(*args, **kwargs):
+                mw.cancel()
+                if is_yes:
+                    self.__delete_field()
+
+            return func
+
+        yes_button = Button(master=mw.top, text='Да', command=on_click(True))
+        no_button = Button(master=mw.top, text='Нет', command=on_click(False))
+        mw.add_button(yes_button)
+        mw.add_button(no_button)
+    def import_fileds_state(self, list_of_function):
+        for entry in self.entries_list:
+            entry.pack_forget()
+        self.entries_list = []
+        for func in list_of_function:
+            self.add_entry(default_str=func)
 
 # class for plotting (класс для построения графиков)
 class Plotter:
@@ -157,6 +218,34 @@ class Commands:
         self._state.save_state()
         return self
 
+    def delete_func(self, *args, **kwargs):
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.parent_window.entries.delete_func()
+
+    def load_plot(self):
+        filename = askopenfile()
+        if filename is None:
+            return
+        self._state.reset_state()
+        self._state.list_of_function = json.load(filename)['list_of_function']
+        self.parent_window.entries.import_entries_state(self._state.list_of_function)
+        list_of_functions = [func for func in self._state.list_of_function if Commands.is_not_blank(func)]
+        figure = self.parent_window.plotter.plot(list_of_functions)
+        self._state.figure = figure
+        self.__forget_canvas()
+        self.__figure_canvas = FigureCanvasTkAgg(figure, self.parent_window)
+        self.__forget_navigation()
+        self.__navigation_toolbar = NavigationToolbar2Tk(self.__figure_canvas, self.parent_window)
+        self.__figure_canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
+        plot_button = self.parent_window.get_button_by_name('plot')
+        if plot_button:
+            plot_button.pack_forget()
+
+    @classmethod
+    def is_not_blank(func):
+        return bool(func and not func.isspace())
+
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
@@ -231,6 +320,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Load from...", command=self.commands.get_command_by_name('load'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -248,11 +338,14 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('delete_func', commands_main.delete_func)
+    commands_main.add_command('load', commands_main.load_plot)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
     # init first entry (создаем первое поле ввода)
+    app.add_button('delete_func', 'Удалить функцию', 'delete_func', hot_key='<Control-r>')
     entries_main.add_entry()
     app.create_menu()
     # добавил комментарий для коммита
