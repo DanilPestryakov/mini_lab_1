@@ -7,6 +7,7 @@ import numpy as np
 from functools import partial
 from tkinter import *
 from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import askopenfile
 
 from matplotlib import pyplot as plt
 
@@ -21,6 +22,7 @@ class Entries:
     def __init__(self):
         self.entries_list = []
         self.parent_window = None
+        self.current = None
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
@@ -36,6 +38,48 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+
+    def remove_entry(self, entry):
+        """Removes an entry from entries list"""
+        self.entries_list.remove(entry)
+        entry.destroy()
+
+    def remove_all_entries(self):
+        """Removes all entries"""
+        for entry in self.entries_list:
+            entry.destroy()
+        self.entries_list = []
+
+    # удаление активного текстового поля и соответствующего графика
+    def remove_current(self):
+        """When the current entry is specified removes it"""
+        self.remove_entry(self.current)
+        self.current = None
+        self.parent_window.commands.plot()
+
+    def modal_for_entry_removal(self):
+        """A prompt for entry removal. Creates a modal window which removes
+        an entry if 'Yes' is chosen"""
+        modal = ModalWindow(
+            self,
+            self.parent_window,
+            title='Удаление: текстовое поле',
+            labeltext='Нажмите \'Да\', если действительно хотите удалить текстовое поле, иначе нажмите \'Нет\''
+        )
+        confirm = Button(master=modal.top, text='Да', bg="green", fg="white", command=modal.delete)
+        deny = Button(master=modal.top, text='Нет', bg="red", fg="white", command=modal.cancel)
+        modal.add_button(deny)
+        modal.add_button(confirm)
+        return modal
+
+    def delete_current(self):
+        """Effectively deletes current entry and asks the user if the deletion is intentional"""
+        if len(self.entries_list) >= 2:  # changed from 0 so that there is always 1 entry
+            self.current = self.parent_window.focus_get()
+            if self.current.get() != "":
+                self.modal_for_entry_removal()
+            else:
+                self.remove_current()
 
 
 # class for plotting (класс для построения графиков)
@@ -89,8 +133,19 @@ class Commands:
         def reset_state(self):
             self.list_of_function = []
 
-    def __init__(self):
-        self.command_dict = {}
+    def download(self):
+        """Method for retrieving function names from a file specified in a prompt"""
+        self.parent_window.entries.remove_all_entries()
+        funcs = StringsFromFile(".json", 'functions').to_list()
+        if funcs != []:
+            for func_str in funcs:
+                self.parent_window.entries.add_entry()
+                self.parent_window.entries.entries_list[-1].insert(0, func_str)
+            self.parent_window.commands.plot()
+        return self
+
+    def __init__(self, commands_dict=None):
+        self.command_dict = commands_dict or {}
         self.__figure_canvas = None
         self.__navigation_toolbar = None
         self._state = Commands.State()
@@ -102,6 +157,12 @@ class Commands:
 
     def add_command(self, name, command):
         self.command_dict[name] = command
+
+    def add_all_commands(self, commands):
+        """Adds all commands from a dict"""
+        for name in commands:
+            self.command_dict[name] = commands[name]
+        return self
 
     def get_command_by_name(self, command_name):
         return self.command_dict[command_name]
@@ -127,12 +188,14 @@ class Commands:
                 list_of_function.append(get_func_str)
             else:
                 if self.__empty_entry_counter == 0:
-                    mw = ModalWindow(self.parent_window, title='Пустая строка', labeltext='Это пример модального окна, '
-                                                                                          'возникающий, если ты ввел '
-                                                                                          'пустую '
-                                                                                          'строку. С этим ничего '
-                                                                                          'делать не нужно. '
-                                                                                          'Просто нажми OK :)')
+                    mw = ModalWindow(
+                        self,
+                        self.parent_window,
+                        title='Пустая строка',
+                        labeltext='Это пример модального окна, возникающий, '
+                                  'если ты ввел  пустую строку. С этим ничего '
+                                  'делать не нужно. Просто нажми OK :)'
+                    )
                     ok_button = Button(master=mw.top, text='OK', command=mw.cancel)
                     mw.add_button(ok_button)
                     self.__empty_entry_counter = 1
@@ -157,6 +220,25 @@ class Commands:
         self._state.save_state()
         return self
 
+    def delete_current(self, *args, **kwargs):
+        """Forwards the delete call to parent window"""
+        self.parent_window.entries.delete_current()
+        return self
+
+
+class StringsFromFile:
+    def __init__(self, ext, prop):
+        self.ext = ext
+        self.prop = prop
+
+    def to_list(self):
+        """Retrieves an array of strings by a specific name from a file with a file prompt"""
+        file = askopenfile(defaultextension=self.ext)
+        if file is not None:
+            data = json.load(file)
+            return data[self.prop]
+        return []
+
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
@@ -180,11 +262,12 @@ class Buttons:
 
 # class for generate modal windows (класс для генерации модальных окон)
 class ModalWindow:
-    def __init__(self, parent, title, labeltext=''):
+    def __init__(self, window, parent, title, labeltext=''):
         self.buttons = []
         self.top = Toplevel(parent)
         self.top.transient(parent)
         self.top.grab_set()
+        self.window = window
         if len(title) > 0:
             self.top.title(title)
         if len(labeltext) == 0:
@@ -196,6 +279,11 @@ class ModalWindow:
         button.pack(pady=5)
 
     def cancel(self):
+        self.top.destroy()
+
+    def delete(self):
+        """Removes an active text window"""
+        self.window.remove_current()
         self.top.destroy()
 
 
@@ -231,27 +319,32 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Download", command=self.commands.get_command_by_name('download'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
 if __name__ == "__main__":
-    # init buttons (создаем кнопки)
-    buttons_main = Buttons()
-    # init plotter (создаем отрисовщик графиков)
-    plotter_main = Plotter()
-    # init commands for executing on buttons or hot keys press
-    # (создаем команды, которые выполняются при нажатии кнопок или горячих клавиш)
-    commands_main = Commands()
+    commands = Commands()
     # init entries (создаем текстовые поля)
     entries_main = Entries()
-    # command's registration (регистрация команд)
-    commands_main.add_command('plot', commands_main.plot)
-    commands_main.add_command('add_func', commands_main.add_func)
-    commands_main.add_command('save_as', commands_main.save_as)
     # init app (создаем экземпляр приложения)
-    app = App(buttons_main, plotter_main, commands_main, entries_main)
+    app = App(
+        Buttons(),
+        Plotter(),
+        commands.add_all_commands(
+            {
+                'plot': commands.plot,
+                'add_func': commands.add_func,
+                'save_as': commands.save_as,
+                'delete_current': commands.delete_current,
+                'download': commands.download
+            }
+        ),
+        entries_main
+    )
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('delete_current', 'Удалить поле', 'delete_current', hot_key='<Control-r>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()

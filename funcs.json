@@ -1,1 +1,1 @@
-{"functions" : ["x", "sin(x)", "log(x)"]}
+{"functions" : ["x", "sin(x)", "log(x)", "sin(x)*x"]}
