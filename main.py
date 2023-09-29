@@ -1,20 +1,15 @@
 import json
 import matplotlib
-
 import numexpr as ne
 import numpy as np
-
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
-
+from tkinter.filedialog import (asksaveasfile, askopenfilename)
 from matplotlib import pyplot as plt
-
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
                                                NavigationToolbar2Tk)
 
 matplotlib.use('TkAgg')
-
 
 # class for entries storage (класс для хранения текстовых полей)
 class Entries:
@@ -37,6 +32,30 @@ class Entries:
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
 
+    def delete_active_entry(self):
+        if self.entries_list:
+            active_entry = self.entries_list[-1]
+            get_func_str = active_entry.get()
+            if get_func_str.strip() != '':
+                mw = ModalWindow(self.parent_window, title='Предупреждение',
+                                 labeltext='Вы уверены, что хотите удалить непустое поле?')
+                yes_button = Button(master=mw.top, text='Да',
+                                    command=lambda: [mw.cancel(), active_entry.pack_forget(), self.entries_list.pop(),
+                                                     self.parent_window.commands.plot()])
+                no_button = Button(master=mw.top, text='Нет', command=mw.cancel)
+                mw.add_button(yes_button)
+                mw.add_button(no_button)
+            else:
+                active_entry.pack_forget()
+                self.entries_list.pop()
+
+            if not self.entries_list:
+                plot_button = self.parent_window.get_button_by_name('plot')
+                if plot_button:
+                    plot_button.pack_forget()
+
+            if get_func_str.strip() != '':
+                self.parent_window.commands.plot()
 
 # class for plotting (класс для построения графиков)
 class Plotter:
@@ -72,7 +91,6 @@ class Plotter:
         self._last_plotted_figure = fig
         return fig
 
-
 # class for commands storage (класс для хранения команд)
 class Commands:
     class State:
@@ -105,6 +123,9 @@ class Commands:
 
     def get_command_by_name(self, command_name):
         return self.command_dict[command_name]
+
+    def delete_active_entry(self, *args, **kwargs):
+        self.parent_window.entries.delete_active_entry()
 
     def __forget_canvas(self):
         if self.__figure_canvas is not None:
@@ -157,6 +178,19 @@ class Commands:
         self._state.save_state()
         return self
 
+    def open_session(self):
+        file_path = askopenfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")])
+        if file_path:
+            for entry in self.parent_window.entries.entries_list:
+                entry.pack_forget()
+            with open(file_path, 'r') as file:
+                session_data = json.load(file)
+                self.list_of_function = session_data['list_of_function']
+                self.parent_window.entries.entries_list.clear()
+                for func_str in self.list_of_function:
+                    self.parent_window.entries.add_entry()
+                    self.parent_window.entries.entries_list[-1].insert(0, func_str)
+        self.parent_window.commands.plot()
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
@@ -177,7 +211,6 @@ class Buttons:
         if button:
             button.pack_forget()
 
-
 # class for generate modal windows (класс для генерации модальных окон)
 class ModalWindow:
     def __init__(self, parent, title, labeltext=''):
@@ -197,7 +230,6 @@ class ModalWindow:
 
     def cancel(self):
         self.top.destroy()
-
 
 # app class (класс приложения)
 class App(Tk):
@@ -232,7 +264,7 @@ class App(Tk):
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
         menu.add_cascade(label="File", menu=file_menu)
-
+        file_menu.add_command(label="Open Session", command=self.commands.get_command_by_name('open_session'))
 
 if __name__ == "__main__":
     # init buttons (создаем кнопки)
@@ -248,10 +280,13 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('delete_entry', commands_main.delete_active_entry)
+    commands_main.add_command('open_session', commands_main.open_session)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('delete_entry', 'Удалить текущее поле', 'delete_entry', hot_key='<Control-d>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
