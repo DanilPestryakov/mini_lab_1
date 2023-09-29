@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfilename
 
 from matplotlib import pyplot as plt
 
@@ -24,6 +24,41 @@ class Entries:
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
+
+    def ask_delete_entry(self):
+        active_entry = self.parent_window.focus_get()
+        name_of_function = active_entry.get()
+        if active_entry in self.entries_list:
+            if not name_of_function or name_of_function.isspace():
+                self.delete_entry(active_entry)
+                return
+            mw1 = ModalWindow(self.parent_window, title='Внимание', labeltext='Вы уверены, что хотите удалить функцию?')
+            ok_button = Button(master=mw1.top, text='OK', command=mw1.cancel)
+            mw1.add_button(ok_button)
+            ok_button.bind('<Button-1>', lambda event: self.delete_entry(active_entry))
+            self.parent_window.wait_window(mw1.top)
+
+    def delete_entries(self):
+        for entry in self.entries_list:
+            entry.destroy()
+        self.entries_list = []
+
+    def add_Text(self, list_of_func):
+        for func in list_of_func:
+            text = StringVar()
+            text.set(func)
+            new_entry = Entry(self.parent_window, textvariable=text)
+            new_entry.pack()
+            self.entries_list.append(new_entry)
+        plot_button = self.parent_window.get_button_by_name('plot')
+        if plot_button:
+            plot_button.pack_forget()
+        self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
+
+    # deleting an entry (удаление текстового поля)
+    def delete_entry(self, active_entry):
+        active_entry.destroy()
+        self.entries_list.remove(active_entry)
 
     # adding of new entry (добавление нового текстового поля)
     def add_entry(self):
@@ -97,11 +132,31 @@ class Commands:
         self.__empty_entry_counter = 0
         self.parent_window = None
 
+
+    def load(self):
+        file_in = askopenfilename(defaultextension=".json")
+        if file_in is not None:
+            with open(file_in, "r") as file:
+                tmp_dict = json.load(file)
+        self.parent_window.entries.delete_entries()
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self._state.reset_state()
+        self._state.list_of_function = tmp_dict['list_of_function']
+        self.parent_window.entries.add_Text(self._state.list_of_function)
+        self.plot()
+
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
     def add_command(self, name, command):
         self.command_dict[name] = command
+
+    def delete_function(self, *args, **kwargs):
+        self.parent_window.entries.ask_delete_entry()
+        self.__forget_canvas()
+        self.__forget_navigation()
+        self.plot()
 
     def get_command_by_name(self, command_name):
         return self.command_dict[command_name]
@@ -231,6 +286,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Open...", command=self.commands.get_command_by_name('load'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -246,12 +302,15 @@ if __name__ == "__main__":
     entries_main = Entries()
     # command's registration (регистрация команд)
     commands_main.add_command('plot', commands_main.plot)
+    commands_main.add_command('delete_function', commands_main.delete_function)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('load', commands_main.load)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('delete_function', 'Удалить функцию', 'delete_function', hot_key='<Control-q>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
