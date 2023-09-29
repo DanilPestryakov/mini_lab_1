@@ -1,4 +1,8 @@
 import json
+import os
+import subprocess
+from tkinter import filedialog
+
 import matplotlib
 
 import numexpr as ne
@@ -6,7 +10,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfilename
 
 from matplotlib import pyplot as plt
 
@@ -36,6 +40,9 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+
+    def get_focused(self):
+        print(self.parent_window.get_focus())
 
 
 # class for plotting (класс для построения графиков)
@@ -153,6 +160,48 @@ class Commands:
         self.__forget_navigation()
         self.parent_window.entries.add_entry()
 
+    def del_func(self, *args, **kwargs):
+        widget = self.parent_window.focus_get()
+        if widget in self.parent_window.entries.entries_list:
+            if widget.get().strip() != "":
+                mw = ModalWindow(self.parent_window, title='Удаление функции', labeltext='О нет! '
+                                                                                      'Вы удалили поле с функцией, '
+                                                                                      'нажмите ОК :('
+                                                                                    )
+                ok_button = Button(master=mw.top, text='OK', command=mw.cancel)
+                mw.add_button(ok_button)
+                self.__empty_entry_counter = 1
+                self.parent_window.entries.entries_list.remove(widget)
+                widget.pack_forget()
+                self.parent_window.commands.plot()
+            else:
+                self.parent_window.entries.entries_list.remove(widget)
+                widget.pack_forget()
+    def open(self):
+        try:
+            file_to_open = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
+            if file_to_open:
+                with open(file_to_open, 'r') as file:
+                    data = json.load(file)
+                if 'list_of_function' in data:
+                    self._state.reset_state()
+                    for entry in self.parent_window.entries.entries_list:
+                        entry.pack_forget()
+                    self.parent_window.entries.entries_list.clear()
+                    for func_str in data['list_of_function']:
+                        self.parent_window.entries.add_entry()
+                        entry = self.parent_window.entries.entries_list[-1]
+                        entry.delete(0, END)
+                        entry.insert(0, func_str)
+                    self.parent_window.commands.plot()
+                    filename = os.path.basename(file_to_open)
+                    mw = ModalWindow(self.parent_window, title='Открытие файла', labeltext = f'Вы открыли файл: {filename}')
+                    ok_button = Button(master=mw.top, text='OK', command=mw.cancel)
+                    mw.add_button(ok_button)
+            else:
+                print("Файл не выбран")
+        except Exception as e:
+            print(f"Ошибка открытия файла: {e}")
     def save_as(self):
         self._state.save_state()
         return self
@@ -230,6 +279,7 @@ class App(Tk):
         self.config(menu=menu)
 
         file_menu = Menu(menu)
+        file_menu.add_command(label="Open...", command=self.commands.get_command_by_name('open'))
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
         menu.add_cascade(label="File", menu=file_menu)
 
@@ -247,14 +297,17 @@ if __name__ == "__main__":
     # command's registration (регистрация команд)
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
+    commands_main.add_command('open', commands_main.open)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('del_func', commands_main.del_func)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('del_func', 'Удалить функцию', 'del_func', hot_key='<Control-d>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
     # добавил комментарий для коммита
-    # application launch (запуск "вечного" цикла приложеня)
+    # application launch (запуск "вечного" цикла приложения)
     app.mainloop()
