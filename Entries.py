@@ -30,7 +30,7 @@ class Entries:
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
-    # adding of new entry (добавление нового текстового поля)
+    # adding a new entry and returning the entry widget (добавление нового текстового поля и возврат виджета поля)
     def add_entry(self):
         new_entry = Entry(self.parent_window)
         new_entry.icursor(0)
@@ -41,6 +41,7 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+        return new_entry
 
     # deleting of active entry (удаление активного текстового поля)
     def delete_entry(self):

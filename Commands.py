@@ -7,6 +7,7 @@ import numpy as np
 from functools import partial
 from tkinter import *
 from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import askopenfilename
 
 from matplotlib import pyplot as plt
 
@@ -102,3 +103,15 @@ class Commands:
     def save_as(self):
         self._state.save_state()
         return self
+
+    def open_file(self):
+        file_path = askopenfilename(filetypes=(("JSON files", "*.json"), ("All files", "*.*")))
+        if file_path:
+            with open(file_path) as file:
+                data = json.load(file)
+                list_of_functions = data.get("list_of_function", [])
+                self.parent_window.entries.delete_entry()
+                for func in list_of_functions:
+                    entry = self.parent_window.entries.add_entry()
+                    entry.insert(0, func)
+                self.parent_window.commands.plot()
