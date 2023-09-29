@@ -221,6 +221,7 @@ class ModalWindow:
         self.top = Toplevel(parent)
         self.top.transient(parent)
         self.top.grab_set()
+        self.choice = None
         if len(title) > 0:
             self.top.title(title)
         if len(labeltext) == 0:
@@ -305,10 +306,10 @@ if __name__ == "__main__":
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
-    app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-x>')
     app.add_button('delete_focus_entry', 'Удалить окно',
                    'delete_focus_entry')
-    app.add_hot_key('<Alt-a>','delete_last_entry')
+    app.add_hot_key('<Alt-x>','delete_last_entry')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
