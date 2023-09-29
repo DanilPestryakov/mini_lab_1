@@ -4,9 +4,11 @@ import matplotlib
 import numexpr as ne
 import numpy as np
 
+
 from functools import partial
 from tkinter import *
 from tkinter.filedialog import asksaveasfile
+from tkinter import filedialog
 
 from matplotlib import pyplot as plt
 
@@ -21,13 +23,16 @@ class Entries:
     def __init__(self):
         self.entries_list = []
         self.parent_window = None
+        self.del_entry = None
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
     # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
+    def add_entry(self, text=''):
         new_entry = Entry(self.parent_window)
+        # вставляем текст считанный из файла (используется при считывании из файла)
+        new_entry.insert(0, text)
         new_entry.icursor(0)
         new_entry.focus()
         new_entry.pack()
@@ -37,6 +42,34 @@ class Entries:
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
 
+    # вызов модального окна при удалении функции
+    def del_modal_w(self):
+        self.del_entry = self.parent_window.focus_get()
+
+        if len(self.del_entry.get()) != 0:
+            mw = ModalWindow(self.parent_window, title='Удаление функции',
+                             labeltext='Вы уверены, что хотите удалить функцию')
+            yes_button = Button(master=mw.top, text='Да', command=mw.delete)
+            mw.add_button(yes_button)
+            no_button = Button(master=mw.top, text='Нет', command=mw.cancel)
+            mw.add_button(no_button)
+        else:
+            self.del_func()
+
+# удаление активного текстового поля (у которого "мигает" курсор)
+    def del_func(self):
+        self.entries_list.remove(self.del_entry)
+        self.del_entry.destroy()
+        # удаление активного поля и обновление графиков функций
+        # parent_window.plotter.has_been_called указывает были ли построены графики функций на момент удаления функции
+        if self.parent_window.plotter.has_been_called == True:
+            self.parent_window.commands.plot()
+
+    # удаление списка текстовых окон (необходимо ля восстановления сессии)
+    def releasing_the_list(self):
+        for entry in self.entries_list:
+            entry.destroy()
+        self.entries_list.clear()
 
 # class for plotting (класс для построения графиков)
 class Plotter:
@@ -47,12 +80,14 @@ class Plotter:
         self._last_plotted_list_of_function = None
         self._last_plotted_figure = None
         self.parent_window = None
+        self.has_been_called = False #пользовались ли функцией построения графиков
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
     # plotting of graphics (построение графиков функций)
     def plot(self, list_of_function, title='Графики функций', x_label='x', y_label='y', need_legend=True):
+        self.has_been_called = True
         fig = plt.figure()
 
         x = np.arange(self.x_min, self.x_max, self.dx)
@@ -66,6 +101,8 @@ class Plotter:
         fig.suptitle(title)
         plt.xlabel(x_label)
         plt.ylabel(y_label)
+        # добавили сетку;
+        plt.grid(True)
         if need_legend:
             plt.legend(list_of_function)
         self._last_plotted_list_of_function = list_of_function
@@ -148,15 +185,31 @@ class Commands:
         if plot_button:
             plot_button.pack_forget()
 
+    # команда для загрузки графиков из предыдущей сессии
+    def plot_download(self):
+        # сначала удаляем все текстовые окна из текущей сессии
+        self.parent_window.entries.releasing_the_list()
+
+        file = filedialog.askopenfile(defaultextension=".json")
+        if file is not None:
+            function = json.load(file)
+            for func_str in function['list_of_function']:
+                self.parent_window.entries.add_entry(func_str)
+            self.plot()
+
     def add_func(self, *args, **kwargs):
         self.__forget_canvas()
         self.__forget_navigation()
+        self.parent_window.plotter.has_been_called = False
         self.parent_window.entries.add_entry()
 
     def save_as(self):
         self._state.save_state()
         return self
 
+# команда для удаления активного текстового поля и соответсвующего графика функции
+    def del_func(self, *args, **kwargs):
+        self.parent_window.entries.del_modal_w()
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
@@ -181,6 +234,7 @@ class Buttons:
 # class for generate modal windows (класс для генерации модальных окон)
 class ModalWindow:
     def __init__(self, parent, title, labeltext=''):
+        self.parent_window=parent
         self.buttons = []
         self.top = Toplevel(parent)
         self.top.transient(parent)
@@ -198,6 +252,10 @@ class ModalWindow:
     def cancel(self):
         self.top.destroy()
 
+    #удаление функции после подтверждения пользователем
+    def delete(self):
+        self.parent_window.entries.del_func()
+        self.top.destroy()
 
 # app class (класс приложения)
 class App(Tk):
@@ -231,8 +289,8 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Restore session", command=self.commands.get_command_by_name('plot_download'))
         menu.add_cascade(label="File", menu=file_menu)
-
 
 if __name__ == "__main__":
     # init buttons (создаем кнопки)
@@ -248,10 +306,14 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('del_func', commands_main.del_func)
+    commands_main.add_command('plot_download', commands_main.plot_download)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    # кнопка удаления текстового поля и горячие клавиши Ctrl+q (обновление графика только, если они были построены до удаления)
+    app.add_button('del_func', 'Удалить функцию (Ctrl+q)', 'del_func', hot_key='<Control-q>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
