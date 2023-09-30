@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfile
 
 from matplotlib import pyplot as plt
 
@@ -21,16 +21,25 @@ class Entries:
     def __init__(self):
         self.entries_list = []
         self.parent_window = None
+        self.current_entry = None
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
 
+    def on_focus(self, evt):
+        self.current_entry = evt.widget
+
     # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
+    def add_entry(self, func = None):
         new_entry = Entry(self.parent_window)
         new_entry.icursor(0)
         new_entry.focus()
         new_entry.pack()
+        new_entry.bind('<FocusIn>', self.on_focus)
+        new_entry.icursor(0)
+        new_entry.focus()
+        if func is not None:
+            new_entry.insert(0,func)
         plot_button = self.parent_window.get_button_by_name('plot')
         if plot_button:
             plot_button.pack_forget()
@@ -72,7 +81,8 @@ class Plotter:
         self._last_plotted_figure = fig
         return fig
 
-
+def is_not_blank(s):
+    return bool(s and not s.isspace())
 # class for commands storage (класс для хранения команд)
 class Commands:
     class State:
@@ -114,10 +124,9 @@ class Commands:
         if self.__navigation_toolbar is not None:
             self.__navigation_toolbar.pack_forget()
 
-    def plot(self, *args, **kwargs):
-        def is_not_blank(s):
-            return bool(s and not s.isspace())
 
+
+    def plot(self, *args, **kwargs):
         self._state.reset_state()
         list_of_function = []
         for entry in self.parent_window.entries.entries_list:
@@ -157,6 +166,46 @@ class Commands:
         self._state.save_state()
         return self
 
+    def load_from(self):
+        file = askopenfile()
+        if file is None:
+            return
+        # self._state.reset_state()
+        for entry in self.parent_window.entries.entries_list:
+            entry.pack_forget()
+        self.parent_window.entries.entries_list = []
+        list_of_function=json.load(file)["list_of_function"]
+        for func in list_of_function:
+            self.parent_window.entries.add_entry(func)
+        self.plot()
+
+    def delete_on_click_proccessing(self, *args, **kwargs):
+        mw = kwargs.get('mw')
+        button = kwargs.get('button')
+        if mw is not None:
+            if button == 'no':
+                mw.cancel()
+                return
+            else:
+                mw.cancel()
+        self.parent_window.entries.current_entry.pack_forget()
+        self.parent_window.entries.entries_list.remove(self.parent_window.entries.current_entry)
+        self.parent_window.entries.current_entry = None
+
+    def delete_on_click(self, *args, **kwargs):
+        if self.parent_window.entries.current_entry is not None and self.parent_window.entries.current_entry in self.parent_window.entries.entries_list:
+            field = self.parent_window.entries.current_entry.get()
+            if is_not_blank(field):
+                window = ModalWindow(self.parent_window, title='Окошко',
+                                     labeltext='Вы уверены что хотите удалить данное поле?')
+                yes_command = partial(self.delete_on_click_proccessing, mw=window)
+                yes_button = Button(master=window.top, text='Да', command=yes_command)
+                window.add_button(yes_button)
+                no_command = partial(self.delete_on_click_proccessing, mw=window, button='no')
+                no_button = Button(master=window.top, text='Нет', command=no_command)
+                window.add_button(no_button)
+            else:
+                self.delete_on_click_proccessing()
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
@@ -231,6 +280,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Load from...", command=self.commands.get_command_by_name('load_from'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -248,10 +298,14 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('load_from',commands_main.load_from)
+    commands_main.add_command('delete_on_click', commands_main.delete_on_click)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
+    app.add_button('delete_on_click', 'Удалить функцию', 'delete_on_click', hot_key='<Control-d>')
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
