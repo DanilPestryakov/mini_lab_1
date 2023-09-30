@@ -260,9 +260,9 @@ class App(Tk):
 
 
         # Adding a "Delete Active Entry" button to the application window
-        delete_active_entry_button = self.buttons.add_button('delete_active_entry', 'Delete Active Entry',
+        delete_active_entry_button = self.buttons.add_button('delete_active_entry', 'Удаление активного текстового поля',
                                                              self.entries.delete_active_entry)
-        delete_active_entry_button.pack(side=RIGHT, padx=5)
+        delete_active_entry_button.pack(side=TOP, padx=5)
 
         # Bind the delete_active_entry method to a key "Esc"
         self.bind('<Escape>', self.delete_active_entry)
