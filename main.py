@@ -164,7 +164,7 @@ class Commands:
                 mw = ModalWindow(self.parent_window, title='Предупреждение', labeltext='Была удалена непустая строка.')
                 button = Button(master=mw.top, text='OK', command=mw.cancel)
                 mw.add_button(button)
-            self.parent_window.entries.delete_entry(app.focus_get())
+            self.parent_window.entries.delete_entry(widget)
             self.plot()
 
     def save_as(self):
