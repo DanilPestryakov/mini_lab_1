@@ -30,7 +30,7 @@ class Entries:
         self.current_entry = evt.widget
 
     # adding of new entry (добавление нового текстового поля)
-    def add_entry(self, func = None):
+    def add_entry(self, func=None):
         new_entry = Entry(self.parent_window)
         new_entry.icursor(0)
         new_entry.focus()
@@ -39,7 +39,7 @@ class Entries:
         new_entry.icursor(0)
         new_entry.focus()
         if func is not None:
-            new_entry.insert(0,func)
+            new_entry.insert(0, func)
         plot_button = self.parent_window.get_button_by_name('plot')
         if plot_button:
             plot_button.pack_forget()
@@ -81,8 +81,11 @@ class Plotter:
         self._last_plotted_figure = fig
         return fig
 
+
 def is_not_blank(s):
     return bool(s and not s.isspace())
+
+
 # class for commands storage (класс для хранения команд)
 class Commands:
     class State:
@@ -123,8 +126,6 @@ class Commands:
     def __forget_navigation(self):
         if self.__navigation_toolbar is not None:
             self.__navigation_toolbar.pack_forget()
-
-
 
     def plot(self, *args, **kwargs):
         self._state.reset_state()
@@ -174,7 +175,7 @@ class Commands:
         for entry in self.parent_window.entries.entries_list:
             entry.pack_forget()
         self.parent_window.entries.entries_list = []
-        list_of_function=json.load(file)["list_of_function"]
+        list_of_function = json.load(file)["list_of_function"]
         for func in list_of_function:
             self.parent_window.entries.add_entry(func)
         self.plot()
@@ -206,6 +207,7 @@ class Commands:
                 window.add_button(no_button)
             else:
                 self.delete_on_click_proccessing()
+
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
@@ -298,7 +300,7 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
-    commands_main.add_command('load_from',commands_main.load_from)
+    commands_main.add_command('load_from', commands_main.load_from)
     commands_main.add_command('delete_on_click', commands_main.delete_on_click)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
