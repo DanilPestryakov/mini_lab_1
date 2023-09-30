@@ -36,6 +36,17 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+    def del_active_entry(self):
+        active_entry = self.parent_window.focus_get()
+        if active_entry in self.entries_list:
+            if active_entry.get():
+                dw = ModalWindow(self.parent_window, title='Warning', labeltext='Непустое поле')
+                ok_button = Button(master=dw.top, text='OK', command=dw.cancel)
+                dw.add_button(ok_button)
+            else:
+                active_entry.destroy()
+                self.entries_list.remove(active_entry)
+
 
 
 # class for plotting (класс для построения графиков)
@@ -157,6 +168,10 @@ class Commands:
         self._state.save_state()
         return self
 
+    def del_active_func(self, *args, **kwargs):
+        self.parent_window.entries.del_active_entry()
+        self.plot()
+
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
@@ -248,10 +263,14 @@ if __name__ == "__main__":
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('save_as', commands_main.save_as)
+
+    commands_main.add_command('del_active_func', commands_main.del_active_func)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+
+    app.add_button('del_active_func', 'Удалить активное поле', 'del_active_func', hot_key='<Control-b>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
