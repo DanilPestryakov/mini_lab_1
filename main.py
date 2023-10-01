@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfilename
 
 from matplotlib import pyplot as plt
 
@@ -36,6 +36,10 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+
+    def delete_entry(self, entry):
+        entry.pack_forget()
+        self.entries_list.remove(entry)
 
 
 # class for plotting (класс для построения графиков)
@@ -88,6 +92,16 @@ class Commands:
 
         def reset_state(self):
             self.list_of_function = []
+
+        def load_state(self):
+            file_path = askopenfilename(defaultextension=".json")
+            if file_path:
+                with open(file_path, 'r') as file_in:
+                    data = json.load(file_in)
+                    list_of_function = data.get('list_of_function', [])
+                if list_of_function:
+                    commands_main.load_functions(list_of_function)
+            return self
 
     def __init__(self):
         self.command_dict = {}
@@ -153,9 +167,36 @@ class Commands:
         self.__forget_navigation()
         self.parent_window.entries.add_entry()
 
+    def delete_func(self, *args, **kwargs):
+        focused_element = app.focus_get()
+        if isinstance(focused_element, Entry) and focused_element in self.parent_window.entries.entries_list:
+            # Проверяем, что текст элемента не пустой
+            if len(focused_element.get()) > 0:
+                mw = ModalWindow(self.parent_window, title='Удалить ' + focused_element.get(),
+                                 labeltext='Это предупреждение о том, что была удалена не пустая строка. '
+                                           'Чтобы продолжить, нажми OK')
+                ok_button = Button(master=mw.top, text='OK', command=mw.cancel)
+                mw.add_button(ok_button)
+            self.parent_window.entries.delete_entry(focused_element)
+            self.plot()
+
     def save_as(self):
         self._state.save_state()
         return self
+
+    def load_func(self):
+        self._state.load_state()
+        return self
+
+    def load_functions(self, list_of_function):
+        self.__forget_canvas()
+        self.__forget_navigation()
+        for entry in self.parent_window.entries.entries_list[:]:
+            self.parent_window.entries.delete_entry(entry)
+        for function in list_of_function:
+            self.parent_window.entries.add_entry()
+            self.parent_window.entries.entries_list[-1].insert(0, function)
+        self.plot()
 
 
 # class for buttons storage (класс для хранения кнопок)
@@ -231,6 +272,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Load...", command=self.commands.get_command_by_name('load_func'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -247,11 +289,15 @@ if __name__ == "__main__":
     # command's registration (регистрация команд)
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
+    commands_main.add_command('delete_func', commands_main.delete_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('load_func', commands_main.load_func)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    # init delete func button (добавляем кнопку удаления текущего текстового поля)
+    app.add_button('delete_func', 'Удалить функцию', 'delete_func', hot_key='<Control-d>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
