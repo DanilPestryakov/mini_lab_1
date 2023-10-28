@@ -26,11 +26,12 @@ class Entries:
         self.parent_window = parent_window
 
     # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
+    def add_entry(self, text = ""):
         new_entry = Entry(self.parent_window)
         new_entry.icursor(0)
         new_entry.focus()
         new_entry.pack()
+        new_entry.insert(0, text)
         plot_button = self.parent_window.get_button_by_name('plot')
         if plot_button:
             plot_button.pack_forget()
@@ -189,18 +190,25 @@ class Commands:
      # Loading a saved session from a JSON file (Загрузка сохраненной сессии из файла JSON)
     def load_session(self):
         file_in = askopenfile(defaultextension=".json", filetypes=[("JSON Files", "*.json")])
-        if file_in:
-            try:
-                data = json.load(file_in)
-                if 'list_of_function' in data:
-                    list_of_function = data['list_of_function']
-                    for func_str in list_of_function:
-                        self.parent_window.entries.add_entry(func_str)
-                    self.parent_window.commands.plot()
-            except json.JSONDecodeError:
-                mw = ModalWindow(self.parent_window, title='Ошибка', labeltext='Не удалось загрузить сессию из файла')
-                ok_button = Button(master=mw.top, text='Ok', command=mw.cancel)
-                mw.add_button(ok_button)
+        if not file_in:
+            return
+        
+        for entry in self.parent_window.entries.entries_list:
+            entry.pack_forget()
+        
+        self.parent_window.entries.entries_list = []
+
+        try:
+            data = json.load(file_in)
+            if 'list_of_function' in data:
+                list_of_function = data['list_of_function']
+                for func_str in list_of_function:
+                    self.parent_window.entries.add_entry(func_str)
+                self.parent_window.commands.plot()
+        except json.JSONDecodeError:
+            mw = ModalWindow(self.parent_window, title='Ошибка', labeltext='Не удалось загрузить сессию из файла')
+            ok_button = Button(master=mw.top, text='Ok', command=mw.cancel)
+            mw.add_button(ok_button)
 
 # class for buttons storage (класс для хранения кнопок)
 class Buttons:
