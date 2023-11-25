@@ -26,9 +26,8 @@ class Entries:
         self.parent_window = parent_window
 
     # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
+    def add_entry(self,default_str=None):
         new_entry = Entry(self.parent_window)
-
         def delete_entery(*args, **kwargs):
             self.delete_entry = new_entry
 
@@ -229,7 +228,7 @@ class Commands:
             return
         self._state.reset_state()
         self._state.list_of_function = json.load(filename)['list_of_function']
-        self.parent_window.entries.import_entries_state(self._state.list_of_function)
+        self.parent_window.entries.import_fileds_state(self._state.list_of_function)
         list_of_functions = [func for func in self._state.list_of_function if Commands.is_not_blank(func)]
         figure = self.parent_window.plotter.plot(list_of_functions)
         self._state.figure = figure
@@ -242,8 +241,8 @@ class Commands:
         if plot_button:
             plot_button.pack_forget()
 
-    @classmethod
-    def is_not_blank(func):
+    @staticmethod
+    def  is_not_blank(func):
         return bool(func and not func.isspace())
 
 
