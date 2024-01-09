@@ -74,9 +74,6 @@ class Commands:
                 list_of_function.append(get_func_str)
             else:
                 if self.__empty_entry_counter == 0:
-                    mw = ModalWindow(self.parent_window, title='Пустая строка', labeltext='Пусто')
-                    ok_button = Button(master=mw.top, text='да', command=mw.cancel)
-                    mw.add_button(ok_button)
                     self.__empty_entry_counter = 1
         self.__empty_entry_counter = 0
         figure = self.parent_window.plotter.plot(list_of_function)
