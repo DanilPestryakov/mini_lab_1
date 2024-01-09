@@ -43,12 +43,28 @@ class Entries:
         self.entries_list.append(new_entry)
         return new_entry
 
-    # deleting of active entry (удаление активного текстового поля)
+    # Подтверждение удаления после открытия модального окна подтверждения
+    def confirm_delete(self, entry, modal):
+        entry.destroy()
+        self.entries_list.remove(entry)
+        modal.top.destroy()
+        # Обновляем график после удаления записи
+        self.parent_window.commands.plot()
+
+    # удаляем активное поле и обновляем график после его удаления
     def delete_entry(self):
         if len(self.entries_list) > 0:
-            self.entries_list[-1].destroy()
-            self.entries_list.pop()
-            plot_button = self.parent_window.get_button_by_name('plot')
-            if plot_button:
-                plot_button.pack_forget()
-            self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
+            # Выбор активного поля
+            focused_entry = self.parent_window.focus_get()
+
+            if focused_entry in self.entries_list:
+                if focused_entry.get().strip():
+                    modal = ModalWindow(self.parent_window, title='Подтверждение', labeltext='Удалить выбранное поле вместе с графиком функции?')
+                    ok_button = Button(master=modal.top, text='Да', command=lambda: self.confirm_delete(focused_entry, modal))
+                    cancel_button = Button(master=modal.top, text='Отмена', command=modal.cancel)
+                    modal.add_button(ok_button)
+                    modal.add_button(cancel_button)
+                else:
+                    # Если поле пустое удаляем без вопросов
+                    focused_entry.destroy()
+                    self.entries_list.remove(focused_entry)
