@@ -29,7 +29,7 @@ class ModalWindow:
         if len(title) > 0:
             self.top.title(title)
         if len(labeltext) == 0:
-            labeltext = 'Default text'
+            labeltext = 'ModalWindow with no text'
         Label(self.top, text=labeltext).pack()
 
     def add_button(self, button):
